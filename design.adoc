@@ -45,13 +45,28 @@ Update time:: Optional
 Markup:: Required. Markdown or AsciiDoc
 Language:: Required. This will be the value of the `lang` attribute of
 the post block in HTML.
-Category:: Required with default. We will not use this. It is for
-backward compatibility.
 Author:: Required. The unique username of the author.
 Body:: Required. The content of the post
+
+== Object IDs
+
+Every post and attachment has a unique ID. The post ID is just an
+integer assigned by the database. The only requirement is it should
+be really unique in the sense that no two posts would have the same
+ID, _even if one of them (or both) has been deleted_.
+
+The ID of an attachment is the hash of its content, as a string, in
+hex representation (lower case).
 
 == Creating a new post
 
 == Rendering a post
+
+=== Caching
+
+An in-memory cache should be maintained for the rendered HTML of each
+post. The rendered HTML is generated on-demand, i.e. if a post does
+not have a cached version, it is generated only when visited. The
+cache should just be a map from the post ID to the rendered HTML.
 
 == Themes
