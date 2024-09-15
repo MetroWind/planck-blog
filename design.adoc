@@ -1,0 +1,57 @@
+= Nsblog Design
+
+== Introduction
+
+The goal is to provide a simple blog framework that covers the
+fundamental requirement of a single-blog website; i.e. Only one blog
+is hosted per server instance. The blog might be used by multiple (but
+a small number of) writers. The service should be easy to deploy
+without a lot of dependencies.
+
+== Features
+
+=== Back-end
+
+- Supports markdown & asciidoc
+- All user data, including blog posts, is stored in a single SQLite db
+  file.
+- Save rendered HTML (just the post body) to a cache dir at first
+  visit. The cache persists until the post is modified or deleted.
+- When rendering a post, go through template substitution twice. The
+  1st time on the rendered post body to substitute any macros in the
+  post. The 2nd time to generate the complete HTML.
+- DB schema is versioned. Updates on the schema would migrate user’s
+  db automatically.
+- Have a command line option to migrate old blog posts into the
+  system.
+- Will not have a table for users. All user info are from
+  OpenID.
+
+=== Front-end
+
+- Provide real time client-side preview when writing markdown, but not adoc.
+- Allow user to write arbitrary template vars in the config.
+
+== Posts
+
+A post contains the following fields:
+
+ID:: Required. A unique name of the post. This is used as filename of
+the post cache.
+Title:: Required
+Abstraction:: Required. Displayed at the posts list
+Publish time:: Optional. If this is empty, the post is a draft
+Update time:: Optional
+Markup:: Required. Markdown or AsciiDoc
+Language:: Required. This will be the value of the `lang` attribute of
+the post block in HTML.
+Category:: Required with default. We will not use this. It is for
+backward compatibility.
+Author:: Required. The unique username of the author.
+Body:: Required. The content of the post
+
+== Creating a new post
+
+== Rendering a post
+
+== Themes
