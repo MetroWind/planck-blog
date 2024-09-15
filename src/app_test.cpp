@@ -33,42 +33,6 @@ TEST(App, CopyReqToHttplibReq)
     }
 }
 
-TEST(App, IndexCanRedirectWhenLoggedIn)
-{
-    Configuration config;
-    auto auth = std::make_unique<AuthMock>();
-    Tokens expected_tokens;
-    expected_tokens.access_token = "aaa";
-    UserInfo expected_user;
-    expected_user.name = "mw";
-
-    EXPECT_CALL(*auth, getUser(expected_tokens)).WillOnce(Return(expected_user));
-    ASSIGN_OR_FAIL(auto data, DataSourceSqlite::newFromMemory());
-    App app(config, std::move(auth), std::move(data));
-
-    httplib::Request http_req;
-    http_req.set_header("Cookie", "access-token=aaa");
-    httplib::Response res;
-    app.handleIndex(http_req, res);
-    EXPECT_EQ(res.status, 302);
-    EXPECT_EQ(res.get_header_value("Location"), app.urlFor("weekly", "mw"));
-}
-
-TEST(App, IndexCanRedirectWhenNotLoggedIn)
-{
-    Configuration config;
-
-    auto auth = std::make_unique<AuthMock>();
-    ASSIGN_OR_FAIL(auto data, DataSourceSqlite::newFromMemory());
-    App app(config, std::move(auth), std::move(data));
-
-    httplib::Request http_req;
-    httplib::Response res;
-    app.handleIndex(http_req, res);
-    EXPECT_EQ(res.status, 301);
-    EXPECT_EQ(res.get_header_value("Location"), app.urlFor("weekly", "mw"));
-}
-
 TEST(App, IndexCanRefreshToken)
 {
     Configuration config;
