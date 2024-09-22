@@ -50,7 +50,17 @@ public:
     virtual E<const HTTPResponse*> post(const HTTPRequest& req) = 0;
 };
 
-// Threads should not share session
+// This class models an HTTP client using libcurl. Threads should not
+// share session.
+//
+// Note that libcurl reuses HTTP connections by default. This may have
+// some unwanted consequeces. For example, if you create a thread for
+// an HTTP server, and make a query to that server using an object of
+// this class, after that you stop the server and join the thread. The
+// server may wait for a period of time before shutting down, instead
+// of shutting down immediately. If you want the client object to drop
+// connection immediately, you have to delete the object. The
+// recommended way of doing this is to use RAII.
 class HTTPSession : public virtual HTTPSessionInterface
 {
 public:

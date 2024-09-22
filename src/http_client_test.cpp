@@ -22,7 +22,7 @@ public:
 testing::Environment* const curl_env =
     testing::AddGlobalTestEnvironment(new CurlEnv);
 
-TEST(DISABLED_HTTPSession, CanGet)
+TEST(HTTPSession, CanGet)
 {
     using namespace std::chrono_literals;
 
@@ -38,31 +38,33 @@ TEST(DISABLED_HTTPSession, CanGet)
     });
     server.wait_until_ready();
 
-    HTTPSession s;
-    auto result = s.get(std::format("http://localhost:{}/", port));
-    ASSERT_TRUE(result.has_value());
-    const std::vector<std::byte>& payload = (*result)->payload;
-    EXPECT_EQ(std::string_view(reinterpret_cast<const char*>(payload.data()),
-                               payload.size()),
-              "aaa");
-    EXPECT_EQ((*result)->status, 200);
-    ASSERT_TRUE((*result)->header.contains("Content-Type"));
-    EXPECT_EQ((*result)->header.at("Content-Type"), "text/plain");
+    {
+        HTTPSession s;
+        auto result = s.get(std::format("http://localhost:{}/", port));
+        ASSERT_TRUE(result.has_value());
+        const std::vector<std::byte>& payload = (*result)->payload;
+        EXPECT_EQ(std::string_view(reinterpret_cast<const char*>(payload.data()),
+                                   payload.size()),
+                  "aaa");
+        EXPECT_EQ((*result)->status, 200);
+        ASSERT_TRUE((*result)->header.contains("Content-Type"));
+        EXPECT_EQ((*result)->header.at("Content-Type"), "text/plain");
 
-    // HTTP error
-    result = s.get(std::format("http://localhost:{}/aaa", port));
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ((*result)->status, 404);
+        // HTTP error
+        result = s.get(std::format("http://localhost:{}/aaa", port));
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ((*result)->status, 404);
 
-    // cURL error
-    result = s.get("http://bad.invalid/");
-    EXPECT_FALSE(result.has_value());
+        // cURL error
+        result = s.get("http://bad.invalid/");
+        EXPECT_FALSE(result.has_value());
+    }
 
     server.stop();
     t.join();
 }
 
-TEST(DISABLED_HTTPSession, CanPost)
+TEST(HTTPSession, CanPost)
 {
     using namespace std::chrono_literals;
 
@@ -89,37 +91,38 @@ TEST(DISABLED_HTTPSession, CanPost)
     });
     server.wait_until_ready();
 
-    HTTPSession s;
     {
-        E<const HTTPResponse*> result = s.post(
-            HTTPRequest(std::format("http://localhost:{}/", port))
-            .setPayload("aaa")
-            .setContentType("text/plain"));
-        ASSERT_TRUE(result.has_value());
-        const HTTPResponse& res = **result;
-        EXPECT_EQ(res.status, 200);
-        ASSERT_TRUE(res.header.contains("Content-Type"));
-        EXPECT_EQ(res.header.at("Content-Type"), "text/plain");
-        EXPECT_EQ(std::string_view(
-                      reinterpret_cast<const char*>(res.payload.data()),
-                      res.payload.size()),
-                  "bbb");
+        HTTPSession s;
+        {
+            E<const HTTPResponse*> result = s.post(
+                HTTPRequest(std::format("http://localhost:{}/", port))
+                .setPayload("aaa")
+                .setContentType("text/plain"));
+            ASSERT_TRUE(result.has_value());
+            const HTTPResponse& res = **result;
+            EXPECT_EQ(res.status, 200);
+            ASSERT_TRUE(res.header.contains("Content-Type"));
+            EXPECT_EQ(res.header.at("Content-Type"), "text/plain");
+            EXPECT_EQ(std::string_view(
+                          reinterpret_cast<const char*>(res.payload.data()),
+                          res.payload.size()),
+                      "bbb");
+        }
+        {
+            E<const HTTPResponse*> result = s.post(
+                HTTPRequest(std::format("http://localhost:{}/", port))
+                .addHeader("Content-Type", "text/plain").setPayload("nonono"));
+            ASSERT_TRUE(result.has_value());
+            const HTTPResponse& res = **result;
+            EXPECT_EQ(res.status, 401);
+            ASSERT_TRUE(res.header.contains("Content-Type"));
+            EXPECT_EQ(res.header.at("Content-Type"), "text/plain");
+            EXPECT_EQ(std::string_view(
+                          reinterpret_cast<const char*>(res.payload.data()),
+                          res.payload.size()),
+                      "error");
+        }
     }
-    {
-        E<const HTTPResponse*> result = s.post(
-            HTTPRequest(std::format("http://localhost:{}/", port))
-            .addHeader("Content-Type", "text/plain").setPayload("nonono"));
-        ASSERT_TRUE(result.has_value());
-        const HTTPResponse& res = **result;
-        EXPECT_EQ(res.status, 401);
-        ASSERT_TRUE(res.header.contains("Content-Type"));
-        EXPECT_EQ(res.header.at("Content-Type"), "text/plain");
-        EXPECT_EQ(std::string_view(
-                      reinterpret_cast<const char*>(res.payload.data()),
-                      res.payload.size()),
-                  "error");
-    }
-
 
     server.stop();
     t.join();
