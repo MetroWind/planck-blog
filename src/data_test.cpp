@@ -23,7 +23,7 @@ TEST(DataSource, CanPublishDraftAndDelete)
     }
 
     Post p;
-    p.markup = Post::MARKDOWN;
+    p.markup = Post::COMMONMARK;
     p.language = "en-US";
     p.raw_content = "aaa";
     p.abstract = "bbb";

@@ -12,7 +12,7 @@ class Post
 public:
     enum Markup
     {
-        MARKDOWN,
+        COMMONMARK,
         ASCIIDOC,
     };
 
@@ -31,6 +31,8 @@ public:
     bool operator==(const Post& rhs) const = default;
 
     static bool isValidMarkupInt(int i);
-    // Render the post to HTML.
-    E<std::string> render() const;
+    static std::string markupToStr(Markup m);
+    static std::optional<Markup> markupFromStr(std::string_view m);
+
+    friend std::ostream& operator<<(std::ostream& stream, const Post& p);
 };

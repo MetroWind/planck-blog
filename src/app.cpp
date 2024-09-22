@@ -1,8 +1,10 @@
 #include <algorithm>
+#include <exception>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <regex>
+#include <thread>
 #include <variant>
 #include <filesystem>
 #include <vector>
@@ -119,6 +121,23 @@ void setTokenCookies(const Tokens& tokens, httplib::Response& res)
     }
 }
 
+E<nlohmann::json> postExcerptToJson(const Post& p)
+{
+    if(!p.id.has_value())
+    {
+        return std::unexpected(runtimeError(
+            "Only post with an ID can be listed"));
+    }
+
+    nlohmann::json result;
+    result["id"] = *p.id;
+    result["title"] = p.title;
+    result["abstract"] = p.abstract;
+    result["language"] = p.language;
+
+    return result;
+}
+
 } // namespace
 
 void copyToHttplibReq(const HTTPRequest& src, httplib::Request& dest)
@@ -174,17 +193,62 @@ E<App::SessionValidation> App::validateSession(const httplib::Request& req) cons
     return SessionValidation::invalid();
 }
 
+std::optional<App::SessionValidation> App::ensureSession(
+    const httplib::Request& req, httplib::Response& res) const
+{
+    E<SessionValidation> session = validateSession(req);
+    if(!session.has_value())
+    {
+        res.status = 500;
+        res.set_content("Failed to validate session.", "text/plain");
+        return std::nullopt;
+    }
+
+    switch(session->status)
+    {
+    case SessionValidation::INVALID:
+        res.status = 401;
+        res.set_content("Invalid session.", "text/plain");
+        return std::nullopt;
+    case SessionValidation::VALID:
+        return *session;
+    case SessionValidation::REFRESHED:
+        setTokenCookies(session->new_tokens, res);
+        return *session;
+    }
+    std::unreachable();
+}
+
 App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
          std::unique_ptr<DataSourceInterface> data_source)
         : config(conf),
           templates((std::filesystem::path(config.data_dir) / "templates" / "")
                     .string()),
-          auth(std::move(openid_auth)), data(std::move(data_source))
+          auth(std::move(openid_auth)),
+          data(std::move(data_source)),
+          post_cache(conf),
+          base_url(),
+          should_stop(false)
 {
-    templates.add_callback("url_for", 2, [&](const inja::Arguments& args)
+    auto u = URL::fromStr(conf.base_url);
+    if(u.has_value())
     {
-        return urlFor(args.at(0)->get_ref<const std::string&>(),
-                      args.at(1)->get_ref<const std::string&>());
+        base_url = *std::move(u);
+    }
+
+    templates.add_callback("url_for", [&](const inja::Arguments& args) ->
+                           std::string
+    {
+        switch(args.size())
+        {
+        case 1:
+            return urlFor(args.at(0)->get_ref<const std::string&>());
+        case 2:
+            return urlFor(args.at(0)->get_ref<const std::string&>(),
+                          args.at(1)->get_ref<const std::string&>());
+        default:
+            return "Invalid number of url_for() arguments";
+        }
     });
 
 }
@@ -193,41 +257,93 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
 {
     if(name == "index")
     {
-        return "/";
+        return base_url.str();
     }
     if(name == "openid-redirect")
     {
-        return "/openid-redirect";
+        return URL(base_url).appendPath("openid-redirect").str();
     }
     if(name == "statics")
     {
-        return "/statics/" + arg;
+        return URL(base_url).appendPath("statics").appendPath(arg).str();
+    }
+    if(name == "login")
+    {
+        return URL(base_url).appendPath("login").str();
+    }
+    if(name == "post")
+    {
+        return URL(base_url).appendPath("p").appendPath(arg).str();
+    }
+    if(name == "drafts")
+    {
+        return URL(base_url).appendPath("drafts").str();
+    }
+    if(name == "attachment")
+    {
+        return URL(base_url).appendPath("attachment").appendPath(arg).str();
+    }
+    if(name == "attachments")
+    {
+        return URL(base_url).appendPath("attachments").str();
+    }
+    if(name == "create-post")
+    {
+        return URL(base_url).appendPath("create-post").str();
+    }
+    if(name == "edit-draft")
+    {
+        return URL(base_url).appendPath("edit-draft").appendPath(arg).str();
+    }
+    // POST endpoints
+    if(name == "save-draft")
+    {
+        return URL(base_url).appendPath("save-draft").str();
+    }
+    if(name == "publish")
+    {
+        return URL(base_url).appendPath("publish").str();
+    }
+    if(name == "upload-attachment")
+    {
+        return URL(base_url).appendPath("upload-attachment").str();
     }
     return "";
 }
 
-void App::handleIndex(const httplib::Request& req, httplib::Response& res) const
+void App::handleIndex(const httplib::Request& req, httplib::Response& res)
 {
     E<SessionValidation> session = validateSession(req);
     if(!session.has_value())
     {
-        // TODO: Do something.
-        return;
+        // Failed to validate session. Maybe the auth server is down.
+        // We still want to serve a index page in this case.
+        session = SessionValidation::invalid();
     }
 
     switch(session->status)
     {
     case SessionValidation::INVALID:
-        // TODO: Do something.
-        return;
     case SessionValidation::VALID:
-        res.set_redirect(urlFor("weekly", session->user.name), 302);
-        return;
+        break;
     case SessionValidation::REFRESHED:
         setTokenCookies(session->new_tokens, res);
-        res.set_redirect(urlFor("weekly", session->user.name), 302);
-        return;
+        break;
     }
+
+    ASSIGN_OR_RESPOND_ERROR(std::vector<Post> posts, data->getPostExcerpts(), res);
+    nlohmann::json posts_json = nlohmann::json::array();
+    for(const Post& p: posts)
+    {
+        ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj, postExcerptToJson(p), res);
+        posts_json.push_back(std::move(pj));
+    }
+    nlohmann::json data{{"posts", std::move(posts_json)},
+                        {"blog_title", config.blog_title},
+                        {"session_user", session->user.name}};
+    std::string result = templates.render_file(
+        "index.html", std::move(data));
+    res.set_content(result, "text/html");
 }
 
 void App::handleLogin(httplib::Response& res) const
@@ -263,12 +379,123 @@ void App::handleOpenIDRedirect(const httplib::Request& req,
     ASSIGN_OR_RESPOND_ERROR(UserInfo user, auth->getUser(tokens), res);
 
     setTokenCookies(tokens, res);
-    res.set_redirect(urlFor("index", ""), 301);
+    res.set_redirect(urlFor("index"), 301);
+}
+
+void App::handleDrafts(const httplib::Request& req, httplib::Response& res)
+{
+    auto session = ensureSession(req, res);
+    if(!session) return;
+
+    ASSIGN_OR_RESPOND_ERROR(std::vector<Post> drafts, data->getDrafts(), res);
+    nlohmann::json drafts_json = nlohmann::json::array();
+    for(const Post& d: drafts)
+    {
+        ASSIGN_OR_RESPOND_ERROR(auto dj, postExcerptToJson(d), res);
+        drafts_json.push_back(std::move(dj));
+    }
+    nlohmann::json data{{"drafts", std::move(drafts_json)},
+                        {"session_user", session->user.name}};
+
+    std::string result = templates.render_file(
+        "drafts.html", std::move(data));
+    res.set_content(result, "text/html");
+}
+
+void App::handleCreatePostFrontEnd(const httplib::Request& req,
+                                   httplib::Response& res)
+{
+    auto session = ensureSession(req, res);
+    if(!session.has_value()) return;
+
+    nlohmann::json data{{"blog_title", config.blog_title},
+                        {"languages", config.languages},
+                        {"session_user", session->user.name}};
+    std::string result = templates.render_file(
+        "create_post.html", std::move(data));
+    res.set_content(result, "text/html");
+}
+
+void App::handleCreateDraft(const httplib::Request& req,
+                            httplib::Response& res) const
+{
+    auto session = ensureSession(req, res);
+    if(!session.has_value()) return;
+
+    Post draft;
+    if(auto m = Post::markupFromStr(req.get_param_value("markup"));
+       m.has_value())
+    {
+        draft.markup = *m;
+    }
+    else
+    {
+        res.status = 400;
+        res.set_content("Invalid markup", "text/plain");
+        return;
+    }
+    draft.title = req.get_param_value("title");
+    draft.abstract = req.get_param_value("abstract");
+    draft.raw_content = req.get_param_value("content");
+    draft.language = req.get_param_value("language");
+    draft.author = session->user.name;
+    ASSIGN_OR_RESPOND_ERROR(int64_t id, data->saveDraft(std::move(draft)), res);
+    res.set_redirect(urlFor("edit-draft", std::to_string(id)));
+}
+
+E<nlohmann::json> App::renderPostToJson(const Post& p)
+{
+    if(!p.id.has_value())
+    {
+        return std::unexpected(runtimeError(
+            "Only post with an ID can be rendered"));
+    }
+
+    nlohmann::json result;
+    result["id"] = *p.id;
+    result["markup"] = Post::markupToStr(p.markup);
+    result["title"] = p.title;
+    result["abstract"] = p.abstract;
+    ASSIGN_OR_RETURN(result["content"], post_cache.renderPost(p));
+    if(p.publish_time.has_value())
+    {
+        result["publish_time"] = timeToSeconds(*p.publish_time);
+        result["publish_time_str"] =
+            std::format("{:%Y-%m-%d %H:%M}", *p.publish_time);
+    }
+    else
+    {
+        result["publish_time"] = 0;
+        result["publish_time_str"] = "";
+    }
+
+    if(p.update_time.has_value())
+    {
+        result["update_time"] = timeToSeconds(*p.update_time);
+        result["update_time_str"] =
+            std::format("{:%Y-%m-%d %H:%M}", *p.update_time);
+    }
+    else
+    {
+        result["update_time"] = 0;
+        result["update_time_str"] = "";
+    }
+
+    result["language"] = p.language;
+    result["author"] = p.author;
+
+    return result;
+}
+
+std::string App::getPath(const std::string& name,
+                         const std::string& arg_name) const
+{
+    return URL::fromStr(urlFor(name, std::string(":") + arg_name)).value()
+        .path();
 }
 
 void App::start()
 {
-    httplib::Server server;
     std::string statics_dir = (std::filesystem::path(config.data_dir) /
                                "statics").string();
     spdlog::info("Mounting static dir at {}...", statics_dir);
@@ -276,27 +503,64 @@ void App::start()
     if (!ret)
     {
         spdlog::error("Failed to mount statics");
+        return;
     }
 
-    server.Get("/", [&](const httplib::Request& req,
-                        httplib::Response& res)
+    server.Get(getPath("index"), [&](const httplib::Request& req,
+                                     httplib::Response& res)
     {
         handleIndex(req, res);
     });
-
-    server.Get("/login", [&]([[maybe_unused]] const httplib::Request& req,
-                             httplib::Response& res)
+    server.Get(getPath("login"), [&]([[maybe_unused]] const httplib::Request& req,
+                                     httplib::Response& res)
     {
         handleLogin(res);
     });
-
-    server.Get("/openid-redirect", [&](const httplib::Request& req,
-                                       httplib::Response& res)
+    server.Get(getPath("openid-redirect"),
+               [&](const httplib::Request& req, httplib::Response& res)
     {
         handleOpenIDRedirect(req, res);
+    });
+    server.Get(getPath("drafts"), [&](const httplib::Request& req,
+                                      httplib::Response& res)
+    {
+        handleDrafts(req, res);
+    });
+    server.Get(getPath("create-post"),
+               [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleCreatePostFrontEnd(req, res);
+    });
+    server.Post(getPath("save-draft"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleCreateDraft(req, res);
     });
 
     spdlog::info("Listening at http://{}:{}/...", config.listen_address,
                  config.listen_port);
-    server.listen(config.listen_address, config.listen_port);
+    server_thread = std::thread([&] {
+        try
+        {
+            server.listen(config.listen_address, config.listen_port);
+        }
+        catch(...)
+        {
+            spdlog::error("Exception when listing.");
+        }
+    });
+    while(!server.is_running());
+    server.wait_until_ready();
+}
+
+void App::stop()
+{
+    should_stop = true;
+    server.stop();
+}
+
+void App::wait()
+{
+    while(!should_stop && server.is_running());
+    server_thread.join();
 }

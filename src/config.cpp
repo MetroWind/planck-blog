@@ -50,13 +50,11 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     Configuration config;
     if(tree["data-dir"].has_key())
     {
-        auto value = tree["data-dir"].val();
-        config.data_dir = std::string(value.begin(), value.end());
+        tree["data-dir"] >> config.data_dir;
     }
     if(tree["listen-address"].has_key())
     {
-        auto value = tree["listen-address"].val();
-        config.listen_address = std::string(value.begin(), value.end());
+        tree["listen-address"] >> config.listen_address;
     }
     if(tree["listen-port"].has_key())
     {
@@ -67,28 +65,30 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     }
     if(tree["client-id"].has_key())
     {
-        auto value = tree["client-id"].val();
-        config.client_id = std::string(value.begin(), value.end());
+        tree["client-id"] >> config.client_id;
     }
     if(tree["client-secret"].has_key())
     {
-        auto value = tree["client-secret"].val();
-        config.client_secret = std::string(value.begin(), value.end());
+        tree["client-secret"] >> config.client_secret;
     }
     if(tree["openid-url-prefix"].has_key())
     {
-        auto value = tree["openid-url-prefix"].val();
-        config.openid_url_prefix = std::string(value.begin(), value.end());
+        tree["openid-url-prefix"] >> config.openid_url_prefix;
     }
-    if(tree["url-prefix"].has_key())
+    if(tree["base-url"].has_key())
     {
-        auto value = tree["url-prefix"].val();
-        config.url_prefix = std::string(value.begin(), value.end());
+        tree["base-url"] >> config.base_url;
     }
-    if(tree["default-lang"].has_key())
+    if(tree["languages"].is_seq())
     {
-        auto value = tree["default-lang"].val();
-        config.default_lang = std::string(value.begin(), value.end());
+        for(const auto& lang: tree["languages"])
+        {
+            lang >> config.languages.emplace_back();
+        }
+    }
+    if(tree["blog-title"].has_key())
+    {
+        tree["blog-title"] >> config.blog_title;
     }
     return E<Configuration>{std::in_place, std::move(config)};
 }

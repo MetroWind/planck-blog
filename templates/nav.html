@@ -1,0 +1,9 @@
+<nav>
+  <span>
+    {% if length(session_user) > 0 %}
+    {{ session_user }}
+    {% else %}
+    <a href="{{ url_for("login") }}">Login</a>
+    {% endif %}
+  </span>
+</nav>

@@ -1,63 +1,48 @@
-#include <expected>
-#include <format>
-
-#include <cmark.h>
-#include <spdlog/spdlog.h>
-
-#include "error.hpp"
-#include "exec.hpp"
 #include "post.hpp"
-#include "utils.hpp"
 
-E<std::string> renderMarkdown(const std::string& src)
-{
-    char* html = cmark_markdown_to_html(src.data(), src.size(),
-                                        CMARK_OPT_DEFAULT);
-    if(html == nullptr)
-    {
-        return std::unexpected(runtimeError("Failed to render Markdown."));
-    }
-    std::string result = html;
-    free(html);
-    return result;
-}
-
-E<std::string> renderAsciiDoc(const std::string& src)
-{
-    std::string output;
-    ASSIGN_OR_RETURN(Process proc, Process::exec(
-        src, {"asciidoctor", "-a", "stylesheet!", "-s", "-o", "-", "-"},
-        &output));
-    ASSIGN_OR_RETURN(int status, proc.wait());
-    if(status != 0)
-    {
-        return std::unexpected(runtimeError(std::format(
-            "AsciiDoctor failed with code {}", status)));
-    }
-    return output;
-}
 
 bool Post::isValidMarkupInt(int i)
 {
     switch(i)
     {
-    case MARKDOWN:
+    case COMMONMARK:
     case ASCIIDOC:
         return true;
     }
     return false;
 }
 
-E<std::string> Post::render() const
+std::string Post::markupToStr(Markup m)
 {
-    switch(markup)
+    switch(m)
     {
-    case MARKDOWN:
-        return renderMarkdown(raw_content);
+    case COMMONMARK:
+        return "commonmark";
     case ASCIIDOC:
-        return renderAsciiDoc(raw_content);
-    default:
-        return std::unexpected(runtimeError(
-            "Somebody forgot to add a switch case for a weekly format!"));
+        return "asciidoc";
     }
+    std::unreachable();
+}
+
+std::optional<Post::Markup> Post::markupFromStr(std::string_view m)
+{
+    if(m == "CommonMark")
+    {
+        return Post::COMMONMARK;
+    }
+    if(m == "AsciiDoc")
+    {
+        return Post::ASCIIDOC;
+    }
+    return std::nullopt;
+}
+
+std::ostream& operator<<(std::ostream& stream, const Post& p)
+{
+    stream << "Title: " << p.title << "\n"
+           << "Abstract: " << p.abstract << "\n"
+           << "Markup: " << Post::markupToStr(p.markup) << "\n"
+           << "Language: " << p.language << "\n"
+           << "Author: " << p.author;
+    return stream;
 }

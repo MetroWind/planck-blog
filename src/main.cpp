@@ -38,10 +38,10 @@ int main(int argc, char** argv)
         return 3;
     }
 
-    auto url_prefix = URL::fromStr(conf->url_prefix);
+    auto url_prefix = URL::fromStr(conf->base_url);
     if(!url_prefix.has_value())
     {
-        spdlog::error("Invalid URL prefix: {}", conf->url_prefix);
+        spdlog::error("Invalid base URL: {}", conf->base_url);
         return 4;
     }
 

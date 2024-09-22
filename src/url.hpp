@@ -45,7 +45,12 @@ public:
     std::string zoneid() const;
     URL& zoneid(const char* value);
 
+    // Append one or multiple segments to the URL, and return self.
+    // This handles trailing and leading slashes correctly.
     URL& appendPath(std::string_view path);
+
+    // Whether this object contains a valid URL
+    bool valid() const { return url != nullptr; }
 
 private:
     void init();

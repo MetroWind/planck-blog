@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include "head.html" %}
+    <title>Drafts</title>
+  </head>
+  <body>
+    <div id="Body">
+      {% include "nav.html" %}
+      <ul id="DraftList">
+        {% for draft in drafts %}
+        <li><a href="{{ url_for("edit-draft", draft.id) }}">
+            {{ draft.title }}
+        </a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </body>
+</html>

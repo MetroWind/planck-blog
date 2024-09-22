@@ -72,6 +72,8 @@ set(SOURCE_FILES
   src/http_client.hpp
   src/post.cpp
   src/post.hpp
+  src/post_rendering.cpp
+  src/post_rendering.hpp
   src/url.cpp
   src/url.hpp
   src/utils.hpp
@@ -109,12 +111,13 @@ set(TEST_FILES
   src/app_test.cpp
   src/auth_mock.hpp
   src/auth_test.cpp
+  src/data_mock.hpp
   src/data_test.cpp
   src/database_test.cpp
   src/exec_test.cpp
   src/http_client_mock.hpp
   src/http_client_test.cpp
-  src/post_test.cpp
+  src/post_rendering_test.cpp
   src/test_utils.hpp
   src/url_test.cpp
   src/utils_test.cpp
@@ -140,4 +143,6 @@ target_link_libraries(nsblog_test PRIVATE
 
 enable_testing()
 include(GoogleTest)
-gtest_discover_tests(nsblog_test)
+gtest_discover_tests(nsblog_test
+  # Need this so that the unit tests can find the templates.
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

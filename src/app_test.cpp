@@ -1,3 +1,4 @@
+#include "gmock/gmock.h"
 #include <httplib.h>
 #include <memory>
 
@@ -7,12 +8,43 @@
 #include "auth.hpp"
 #include "config.hpp"
 #include "auth_mock.hpp"
-#include "data.hpp"
+#include "data_mock.hpp"
 #include "http_client.hpp"
 #include "test_utils.hpp"
 
 using ::testing::Return;
 using ::testing::HasSubstr;
+
+class UserAppTest : public testing::Test
+{
+protected:
+    UserAppTest()
+    {
+        config.base_url = "http://localhost:8080/blog";
+        config.listen_address = "localhost";
+        config.listen_port = 8080;
+        config.data_dir = ".";
+        config.blog_title = "Test Blog";
+
+        auto auth = std::make_unique<AuthMock>();
+
+        UserInfo expected_user;
+        expected_user.name = "mw";
+        Tokens token;
+        token.access_token = "aaa";
+        EXPECT_CALL(*auth, getUser(std::move(token)))
+            .Times(::testing::AtLeast(0))
+            .WillOnce(Return(expected_user));
+        auto data = std::make_unique<DataSourceMock>();
+        data_source = data.get();
+
+        app = std::make_unique<App>(config, std::move(auth), std::move(data));
+    }
+
+    Configuration config;
+    std::unique_ptr<App> app;
+    const DataSourceMock* data_source;
+};
 
 TEST(App, CopyReqToHttplibReq)
 {
@@ -31,33 +63,6 @@ TEST(App, CopyReqToHttplibReq)
         copyToHttplibReq(req, http_req);
         EXPECT_EQ(http_req.get_header_value("Content-Type"), "image/png");
     }
-}
-
-TEST(App, IndexCanRefreshToken)
-{
-    Configuration config;
-    Tokens expected_tokens_after_refresh;
-    expected_tokens_after_refresh.access_token = "aaa";
-    UserInfo expected_user;
-    expected_user.name = "mw";
-
-    auto auth = std::make_unique<AuthMock>();
-    EXPECT_CALL(*auth, getUser(expected_tokens_after_refresh))
-        .WillOnce(Return(expected_user));
-    EXPECT_CALL(*auth, refreshTokens("bbb"))
-        .WillOnce(Return(expected_tokens_after_refresh));
-
-    ASSIGN_OR_FAIL(auto data, DataSourceSqlite::newFromMemory());
-    App app(config, std::move(auth), std::move(data));
-
-    httplib::Request req;
-    req.set_header("Cookie", "refresh-token=bbb");
-    httplib::Response res;
-    app.handleIndex(req, res);
-    EXPECT_EQ(res.status, 302);
-    EXPECT_THAT(res.get_header_value("Set-Cookie"),
-                HasSubstr("access-token=aaa"));
-    EXPECT_EQ(res.get_header_value("Location"), app.urlFor("weekly", "mw"));
 }
 
 TEST(App, LoginBringsUserToLoginURL)
@@ -115,4 +120,78 @@ TEST(App, OpenIDRedirectCanHandleUpstreamError)
         app.handleOpenIDRedirect(req, res);
         EXPECT_EQ(res.status, 500);
     }
+}
+
+TEST_F(UserAppTest, CanStart)
+{
+    app->start();
+    app->stop();
+    app->wait();
+}
+
+TEST_F(UserAppTest, CanHandleIndex)
+{
+    EXPECT_CALL(*data_source, getPostExcerpts())
+        .WillOnce(Return(std::vector<Post>()));
+
+    httplib::Request req;
+    req.set_header("Cookie", "access-token=aaa");
+    httplib::Response res;
+    app->handleIndex(req, res);
+    // httplib::Response::status is default to -1. Httplib will set it
+    // when sending the response.
+    EXPECT_EQ(res.status, -1);
+    EXPECT_TRUE(res.body.contains("<title>Test Blog</title>"));
+}
+
+TEST_F(UserAppTest, CanHandleDrafts)
+{
+    EXPECT_CALL(*data_source, getDrafts())
+        .WillOnce(Return(std::vector<Post>()));
+
+    httplib::Request req;
+    req.set_header("Cookie", "access-token=aaa");
+    httplib::Response res;
+    app->handleDrafts(req, res);
+    EXPECT_EQ(res.status, -1);
+    EXPECT_TRUE(res.body.contains("<title>Drafts</title>"));
+}
+
+TEST_F(UserAppTest, CanHandleCreatePostFrontEnd)
+{
+    httplib::Request req;
+    req.set_header("Cookie", "access-token=aaa");
+    httplib::Response res;
+    app->handleCreatePostFrontEnd(req, res);
+    EXPECT_EQ(res.status, -1);
+    EXPECT_TRUE(res.body.contains("<title>New Post</title>"));
+}
+
+TEST_F(UserAppTest, CanHandleCreateDraft)
+{
+    Post p;
+    p.title = "aaa";
+    p.abstract = "bbb";
+    p.language = "ccc";
+    p.markup = Post::COMMONMARK;
+    p.raw_content = "ddd";
+    p.author = "mw";
+    EXPECT_CALL(*data_source, saveDraft(std::move(p))).WillOnce(Return(1));
+
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res,
+                       client.post(
+                           HTTPRequest("http://localhost:8080/blog/save-draft").setPayload(
+                               "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
+                               "content=ddd")
+                           .addHeader("Cookie", "access-token=aaa")
+                           .setContentType("application/x-www-form-urlencoded")));
+
+        EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
+        EXPECT_EQ(res->header.at("Location"), "http://localhost:8080/blog/edit-draft/1");
+    }
+    app->stop();
+    app->wait();
 }
