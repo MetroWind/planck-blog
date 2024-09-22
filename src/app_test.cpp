@@ -181,16 +181,16 @@ TEST_F(UserAppTest, CanHandleCreateDraft)
     app->start();
     {
         HTTPSession client;
-        ASSIGN_OR_FAIL(const HTTPResponse* res,
-                       client.post(
-                           HTTPRequest("http://localhost:8080/blog/save-draft").setPayload(
-                               "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
-                               "content=ddd")
-                           .addHeader("Cookie", "access-token=aaa")
-                           .setContentType("application/x-www-form-urlencoded")));
+        ASSIGN_OR_FAIL(const HTTPResponse* res, client.post(
+            HTTPRequest("http://localhost:8080/blog/save-draft").setPayload(
+                "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
+                "content=ddd")
+            .addHeader("Cookie", "access-token=aaa")
+            .setContentType("application/x-www-form-urlencoded")));
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
-        EXPECT_EQ(res->header.at("Location"), "http://localhost:8080/blog/edit-draft/1");
+        EXPECT_EQ(res->header.at("Location"),
+                  "http://localhost:8080/blog/edit-draft/1");
     }
     app->stop();
     app->wait();
