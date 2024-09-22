@@ -42,7 +42,7 @@
         <div><textarea id="TextContent" name="content" required></textarea></div>
         <div id="ButtonBar">
           <input type="submit" value="Save draft" formaction="{{ url_for("save-draft") }}" formmethod="post" formtarget="_self" />
-          <input type="submit" value="Publish" formaction="{{ url_for("publish") }}" formmethod="post" formtarget="_self" />
+          <input type="submit" value="Publish" formaction="{{ url_for("publish-from-new-draft") }}" formmethod="post" formtarget="_self" />
         </div>
       </form>
     </div>

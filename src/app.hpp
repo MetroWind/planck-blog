@@ -38,6 +38,7 @@ public:
     void handleDrafts(const httplib::Request& req, httplib::Response& res);
     void handleCreatePostFrontEnd(const httplib::Request& req, httplib::Response& res);
     void handleCreateDraft(const httplib::Request& req, httplib::Response& res) const;
+    void handlePublishFromNewDraft(const httplib::Request& req, httplib::Response& res) const;
 
     void start();
     void stop();
@@ -79,6 +80,11 @@ private:
     // requires that the URL is mapped correctly in that function.
     std::string getPath(const std::string& name, const std::string& arg_name="")
         const;
+
+    // Convert HTML form data to post.
+    E<Post> formToPost(const httplib::Request& req, std::string_view author)
+        const;
+
     const Configuration config;
     inja::Environment templates;
     std::unique_ptr<AuthInterface> auth;

@@ -195,3 +195,34 @@ TEST_F(UserAppTest, CanHandleCreateDraft)
     app->stop();
     app->wait();
 }
+
+TEST_F(UserAppTest, CanHandlePublishFromNewDraft)
+{
+    Post p;
+    p.title = "aaa";
+    p.abstract = "bbb";
+    p.language = "ccc";
+    p.markup = Post::COMMONMARK;
+    p.raw_content = "ddd";
+    p.author = "mw";
+    EXPECT_CALL(*data_source, saveDraft(std::move(p))).WillOnce(Return(1));
+    EXPECT_CALL(*data_source, publishPost(1)).WillOnce(Return(E<void>()));
+
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res, client.post(
+            HTTPRequest("http://localhost:8080/blog/publish-from-new-draft")
+            .setPayload(
+                "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
+                "content=ddd")
+            .addHeader("Cookie", "access-token=aaa")
+            .setContentType("application/x-www-form-urlencoded")));
+
+        EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
+        EXPECT_EQ(res->header.at("Location"),
+                  "http://localhost:8080/blog/p/1");
+    }
+    app->stop();
+    app->wait();
+}

@@ -300,9 +300,9 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     {
         return URL(base_url).appendPath("save-draft").str();
     }
-    if(name == "publish")
+    if(name == "publish-from-new-draft")
     {
-        return URL(base_url).appendPath("publish").str();
+        return URL(base_url).appendPath("publish-from-new-draft").str();
     }
     if(name == "upload-attachment")
     {
@@ -422,25 +422,26 @@ void App::handleCreateDraft(const httplib::Request& req,
     auto session = ensureSession(req, res);
     if(!session.has_value()) return;
 
-    Post draft;
-    if(auto m = Post::markupFromStr(req.get_param_value("markup"));
-       m.has_value())
-    {
-        draft.markup = *m;
-    }
-    else
-    {
-        res.status = 400;
-        res.set_content("Invalid markup", "text/plain");
-        return;
-    }
-    draft.title = req.get_param_value("title");
-    draft.abstract = req.get_param_value("abstract");
-    draft.raw_content = req.get_param_value("content");
-    draft.language = req.get_param_value("language");
-    draft.author = session->user.name;
+    ASSIGN_OR_RESPOND_ERROR(Post draft, formToPost(req, session->user.name), res);
     ASSIGN_OR_RESPOND_ERROR(int64_t id, data->saveDraft(std::move(draft)), res);
     res.set_redirect(urlFor("edit-draft", std::to_string(id)));
+}
+
+void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Response& res)
+    const
+{
+    auto session = ensureSession(req, res);
+    if(!session.has_value()) return;
+
+    ASSIGN_OR_RESPOND_ERROR(Post draft, formToPost(req, session->user.name), res);
+    ASSIGN_OR_RESPOND_ERROR(int64_t id, data->saveDraft(std::move(draft)), res);
+    if(!data->publishPost(id))
+    {
+        res.status = 500;
+        res.set_content("Failed to publish", "text/plain");
+        return;
+    }
+    res.set_redirect(urlFor("post", std::to_string(id)));
 }
 
 E<nlohmann::json> App::renderPostToJson(const Post& p)
@@ -494,6 +495,26 @@ std::string App::getPath(const std::string& name,
         .path();
 }
 
+E<Post> App::formToPost(const httplib::Request& req, std::string_view author) const
+{
+    Post draft;
+    if(auto m = Post::markupFromStr(req.get_param_value("markup"));
+       m.has_value())
+    {
+        draft.markup = *m;
+    }
+    else
+    {
+        return std::unexpected(httpError(400, "Invalid markup"));
+    }
+    draft.title = req.get_param_value("title");
+    draft.abstract = req.get_param_value("abstract");
+    draft.raw_content = req.get_param_value("content");
+    draft.language = req.get_param_value("language");
+    draft.author = author;
+    return draft;
+}
+
 void App::start()
 {
     std::string statics_dir = (std::filesystem::path(config.data_dir) /
@@ -535,6 +556,12 @@ void App::start()
                 [&](const httplib::Request& req, httplib::Response& res)
     {
         handleCreateDraft(req, res);
+    });
+
+    server.Post(getPath("publish-from-new-draft"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handlePublishFromNewDraft(req, res);
     });
 
     spdlog::info("Listening at http://{}:{}/...", config.listen_address,
