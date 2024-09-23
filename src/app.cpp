@@ -381,6 +381,37 @@ void App::handleOpenIDRedirect(const httplib::Request& req,
     res.set_redirect(urlFor("index"), 301);
 }
 
+void App::handlePost(const httplib::Request& req, httplib::Response& res)
+{
+    ASSIGN_OR_RESPOND_ERROR(
+        int64_t id, strToNumber<int64_t>(req.path_params.at("id")).or_else(
+            []([[maybe_unused]] auto _) -> E<int64_t>
+            {
+                return std::unexpected(httpError(401, "Invalid post ID"));
+            }), res);
+
+    auto session = prepareSession(req, res, true);
+
+    ASSIGN_OR_RESPOND_ERROR(std::optional<Post> p, data->getPost(id), res);
+    if(!p.has_value())
+    {
+        res.status = 404;
+        res.set_content("Post not found", "text/plain");
+        return;
+    }
+
+    ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj, renderPostToJson(*p), res);
+    spdlog::debug("aaa");
+    nlohmann::json data{{"post", std::move(pj)},
+                        {"blog_title", config.blog_title},
+                        {"session_user", session->user.name}};
+    spdlog::debug(data.dump());
+    std::string result = templates.render_file(
+        "post.html", std::move(data));
+    spdlog::debug(result);
+    res.set_content(result, "text/html");
+}
+
 void App::handleDrafts(const httplib::Request& req, httplib::Response& res)
 {
     auto session = prepareSession(req, res);
@@ -445,14 +476,11 @@ void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Respon
 
 E<nlohmann::json> App::renderPostToJson(const Post& p)
 {
-    if(!p.id.has_value())
-    {
-        return std::unexpected(runtimeError(
-            "Only post with an ID can be rendered"));
-    }
-
     nlohmann::json result;
-    result["id"] = *p.id;
+    if(p.id.has_value())
+    {
+        result["id"] = std::to_string(*p.id);
+    }
     result["markup"] = Post::markupToStr(p.markup);
     result["title"] = p.title;
     result["abstract"] = p.abstract;
@@ -460,25 +488,29 @@ E<nlohmann::json> App::renderPostToJson(const Post& p)
     if(p.publish_time.has_value())
     {
         result["publish_time"] = timeToSeconds(*p.publish_time);
-        result["publish_time_str"] =
-            std::format("{:%Y-%m-%d %H:%M}", *p.publish_time);
+        result["publish_time_str"] = std::format("{:%F %R}", *p.publish_time);
+        result["publish_time_iso8601"] =
+            std::format("{:%FT%R%z}", *p.publish_time);
     }
     else
     {
         result["publish_time"] = 0;
         result["publish_time_str"] = "";
+        result["publish_time_iso8601"] = "";
     }
 
     if(p.update_time.has_value())
     {
         result["update_time"] = timeToSeconds(*p.update_time);
-        result["update_time_str"] =
-            std::format("{:%Y-%m-%d %H:%M}", *p.update_time);
+        result["update_time_str"] = std::format("{:%F %R}", *p.update_time);
+        result["update_time_iso8601"] =
+            std::format("{:%FT%R%z}", *p.update_time);
     }
     else
     {
         result["update_time"] = 0;
         result["update_time_str"] = "";
+        result["update_time_iso8601"] = "";
     }
 
     result["language"] = p.language;
@@ -540,6 +572,11 @@ void App::start()
                [&](const httplib::Request& req, httplib::Response& res)
     {
         handleOpenIDRedirect(req, res);
+    });
+    server.Get(getPath("post", "id"), [&](const httplib::Request& req,
+                                          httplib::Response& res)
+    {
+        handlePost(req, res);
     });
     server.Get(getPath("drafts"), [&](const httplib::Request& req,
                                       httplib::Response& res)

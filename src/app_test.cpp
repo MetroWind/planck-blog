@@ -11,6 +11,7 @@
 #include "data_mock.hpp"
 #include "http_client.hpp"
 #include "test_utils.hpp"
+#include "utils.hpp"
 
 using ::testing::Return;
 using ::testing::HasSubstr;
@@ -222,6 +223,33 @@ TEST_F(UserAppTest, CanHandlePublishFromNewDraft)
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
         EXPECT_EQ(res->header.at("Location"),
                   "http://localhost:8080/blog/p/1");
+    }
+    app->stop();
+    app->wait();
+}
+
+TEST_F(UserAppTest, CanHandlePost)
+{
+    Post p;
+    p.title = "aaa";
+    p.abstract = "bbb";
+    p.language = "ccc";
+    p.markup = Post::COMMONMARK;
+    p.raw_content = "ddd";
+    p.author = "mw";
+    p.publish_time = Clock::now();
+    p.id = 1;
+
+    EXPECT_CALL(*data_source, getPost(1)).WillOnce(Return(p));
+
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res,
+                       client.get(HTTPRequest("http://localhost:8080/blog/p/1")
+                                  .addHeader("Cookie", "access-token=aaa")));
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+        EXPECT_TRUE(res->payloadAsStr().contains("<h1>aaa</h1>"));
     }
     app->stop();
     app->wait();

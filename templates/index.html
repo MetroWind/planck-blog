@@ -13,14 +13,16 @@
       <header id="BlogTitle">
         <h1>{{ blog_title }}</h1>
       </header>
-      <ul id="PostList">
-        {% for post in posts %}
-        <li><hgroup>
-            <h1 class="PostTitle">{{ post.title }}</h1>
-            <p class="Abstract">{{ post.abstract }}</p>
-        </hgroup></li>
-        {% endfor %}
-      </ul>
+      <main>
+        <ul id="PostList">
+          {% for post in posts %}
+          <li><hgroup>
+              <h1 class="PostTitle">{{ post.title }}</h1>
+              <p class="Abstract">{{ post.abstract }}</p>
+          </hgroup></li>
+          {% endfor %}
+        </ul>
+      </main>
     </div>
   </body>
 </html>

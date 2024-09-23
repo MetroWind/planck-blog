@@ -35,6 +35,7 @@ public:
     void handleLogin(httplib::Response& res) const;
     void handleOpenIDRedirect(const httplib::Request& req,
                               httplib::Response& res) const;
+    void handlePost(const httplib::Request& req, httplib::Response& res);
     void handleDrafts(const httplib::Request& req, httplib::Response& res);
     void handleCreatePostFrontEnd(const httplib::Request& req, httplib::Response& res);
     void handleCreateDraft(const httplib::Request& req, httplib::Response& res) const;

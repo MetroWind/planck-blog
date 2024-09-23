@@ -57,6 +57,8 @@ E<std::string> renderPost(const Post& p, [[maybe_unused]] const Configuration& c
 
 E<std::string> PostCache::renderPost(const Post& p)
 {
+    // If a post doesn’t have ID, it’s probably not in the DB yet.
+    // Don’t bother to cache it.
     if(!p.id.has_value())
     {
         return ::renderPost(p, conf);

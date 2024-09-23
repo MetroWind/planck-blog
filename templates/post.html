@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include "head.html" %}
+    <meta property="og:site_name" content="{{ blog_title }}" />
+    <meta property="og:title" content="{{ post.title }}" />
+    <meta property="og:description" content="{{ post.abstract }}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="{{ url_for("post", post.id) }}" />
+    <title>{{ blog_title }} | {{ post.title }}</title>
+  </head>
+  <body>
+    <div id="Body">
+      {% include "nav.html" %}
+      <header id="BlogTitle">
+        <h1>{{ blog_title }}</h1>
+      </header>
+      <main>
+        <article id="Post">
+          <h1>{{ post.title }}</h1>
+          <div id="Metadata">
+            By <span id="Author">{{ post.author }}</span>
+            @<time datetime="{{ post.publish_time_iso8601 }}">
+              {{ post.publish_time_str }}
+            </time>
+            {% if length(post.update_time_str) > 0 %}
+            Updated @<time datetime="{{ post.update_time_iso8601 }}">
+              {{ post.update_time_str }}
+            </time>
+            {% endif %}
+          </div>
+          <div id="PostBody">{{ post.content }}</div>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

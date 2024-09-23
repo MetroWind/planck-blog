@@ -5,6 +5,7 @@
 #include <string_view>
 #include <filesystem>
 #include <stdio.h>
+#include <system_error>
 
 #include <nlohmann/json.hpp>
 #include <curl/curl.h>
@@ -77,4 +78,32 @@ inline E<Time> strToDate(const std::string& s)
         return std::unexpected(runtimeError("Invalid date"));
     }
     return std::chrono::sys_days(date);
+}
+
+template<typename NumType>
+E<NumType> strToNumber(std::string_view s)
+{
+    NumType x;
+    auto begin = std::begin(s);
+    auto end = std::end(s);
+    auto rt = std::from_chars(begin, end, x);
+    if(rt.ptr == end)
+    {
+        return x;
+    }
+    if(rt.ec == std::errc::result_out_of_range)
+    {
+        return std::unexpected(runtimeError("out of range"));
+    }
+    if(rt.ptr > begin)
+    {
+        return std::unexpected(runtimeError(
+            "Only part of the string can be converted to number"));
+    }
+    if(rt.ptr == begin)
+    {
+        return std::unexpected(runtimeError(
+            "Failed to convert string to number"));
+    }
+    std::unreachable();
 }
