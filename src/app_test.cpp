@@ -235,7 +235,7 @@ TEST_F(UserAppTest, CanHandlePost)
     p.abstract = "bbb";
     p.language = "ccc";
     p.markup = Post::COMMONMARK;
-    p.raw_content = "ddd";
+    p.raw_content = "ddd {{ url_for(\"index\") }} eee";
     p.author = "mw";
     p.publish_time = Clock::now();
     p.id = 1;
@@ -250,6 +250,8 @@ TEST_F(UserAppTest, CanHandlePost)
                                   .addHeader("Cookie", "access-token=aaa")));
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_TRUE(res->payloadAsStr().contains("<h1>aaa</h1>"));
+        EXPECT_TRUE(res->payloadAsStr().contains(
+            "ddd http://localhost:8080/blog eee"));
     }
     app->stop();
     app->wait();

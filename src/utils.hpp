@@ -83,7 +83,7 @@ inline E<Time> strToDate(const std::string& s)
 template<typename NumType>
 E<NumType> strToNumber(std::string_view s)
 {
-    NumType x;
+    NumType x{};
     auto begin = std::begin(s);
     auto end = std::end(s);
     auto rt = std::from_chars(begin, end, x);

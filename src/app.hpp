@@ -80,7 +80,7 @@ private:
         const httplib::Request& req, httplib::Response& res,
         bool allow_error_and_invalid=false) const;
 
-    E<nlohmann::json> renderPostToJson(const Post& p);
+    E<nlohmann::json> renderPostToJson(Post&& p);
 
     // This gives a path, optionally with the name of an argument,
     // that is suitable to bind to a URL handler. For example,
