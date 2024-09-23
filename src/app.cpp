@@ -193,30 +193,45 @@ E<App::SessionValidation> App::validateSession(const httplib::Request& req) cons
     return SessionValidation::invalid();
 }
 
-std::optional<App::SessionValidation> App::ensureSession(
-    const httplib::Request& req, httplib::Response& res) const
+std::optional<App::SessionValidation> App::prepareSession(
+    const httplib::Request& req, httplib::Response& res,
+    bool allow_error_and_invalid) const
 {
     E<SessionValidation> session = validateSession(req);
     if(!session.has_value())
     {
-        res.status = 500;
-        res.set_content("Failed to validate session.", "text/plain");
-        return std::nullopt;
+        if(allow_error_and_invalid)
+        {
+            return SessionValidation::invalid();
+        }
+        else
+        {
+            res.status = 500;
+            res.set_content("Failed to validate session.", "text/plain");
+            return std::nullopt;
+        }
     }
 
     switch(session->status)
     {
     case SessionValidation::INVALID:
-        res.status = 401;
-        res.set_content("Invalid session.", "text/plain");
-        return std::nullopt;
+        if(allow_error_and_invalid)
+        {
+            return *session;
+        }
+        else
+        {
+            res.status = 401;
+            res.set_content("Invalid session.", "text/plain");
+            break;
+        }
     case SessionValidation::VALID:
-        return *session;
+        break;
     case SessionValidation::REFRESHED:
         setTokenCookies(session->new_tokens, res);
-        return *session;
+        break;
     }
-    std::unreachable();
+    return *session;
 }
 
 App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
@@ -313,23 +328,7 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
 
 void App::handleIndex(const httplib::Request& req, httplib::Response& res)
 {
-    E<SessionValidation> session = validateSession(req);
-    if(!session.has_value())
-    {
-        // Failed to validate session. Maybe the auth server is down.
-        // We still want to serve a index page in this case.
-        session = SessionValidation::invalid();
-    }
-
-    switch(session->status)
-    {
-    case SessionValidation::INVALID:
-    case SessionValidation::VALID:
-        break;
-    case SessionValidation::REFRESHED:
-        setTokenCookies(session->new_tokens, res);
-        break;
-    }
+    auto session = prepareSession(req, res, true);
 
     ASSIGN_OR_RESPOND_ERROR(std::vector<Post> posts, data->getPostExcerpts(), res);
     nlohmann::json posts_json = nlohmann::json::array();
@@ -384,7 +383,7 @@ void App::handleOpenIDRedirect(const httplib::Request& req,
 
 void App::handleDrafts(const httplib::Request& req, httplib::Response& res)
 {
-    auto session = ensureSession(req, res);
+    auto session = prepareSession(req, res);
     if(!session) return;
 
     ASSIGN_OR_RESPOND_ERROR(std::vector<Post> drafts, data->getDrafts(), res);
@@ -405,7 +404,7 @@ void App::handleDrafts(const httplib::Request& req, httplib::Response& res)
 void App::handleCreatePostFrontEnd(const httplib::Request& req,
                                    httplib::Response& res)
 {
-    auto session = ensureSession(req, res);
+    auto session = prepareSession(req, res);
     if(!session.has_value()) return;
 
     nlohmann::json data{{"blog_title", config.blog_title},
@@ -419,7 +418,7 @@ void App::handleCreatePostFrontEnd(const httplib::Request& req,
 void App::handleCreateDraft(const httplib::Request& req,
                             httplib::Response& res) const
 {
-    auto session = ensureSession(req, res);
+    auto session = prepareSession(req, res);
     if(!session.has_value()) return;
 
     ASSIGN_OR_RESPOND_ERROR(Post draft, formToPost(req, session->user.name), res);
@@ -430,7 +429,7 @@ void App::handleCreateDraft(const httplib::Request& req,
 void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Response& res)
     const
 {
-    auto session = ensureSession(req, res);
+    auto session = prepareSession(req, res);
     if(!session.has_value()) return;
 
     ASSIGN_OR_RESPOND_ERROR(Post draft, formToPost(req, session->user.name), res);

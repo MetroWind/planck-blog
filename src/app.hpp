@@ -67,8 +67,17 @@ private:
         }
     };
     E<SessionValidation> validateSession(const httplib::Request& req) const;
-    std::optional<SessionValidation> ensureSession(
-        const httplib::Request& req, httplib::Response& res) const;
+
+    // Query the auth module for the status of the session. If there
+    // is no session or it fails to query the auth module, set the
+    // status and body in “res” accordingly. If
+    // “allow_error_and_invalid” is true, failure to query and invalid
+    // session are considered ok, and no status and body would be set
+    // in “res”. In this case this function just returns an invalid
+    // session.
+    std::optional<SessionValidation> prepareSession(
+        const httplib::Request& req, httplib::Response& res,
+        bool allow_error_and_invalid=false) const;
 
     E<nlohmann::json> renderPostToJson(const Post& p);
 
