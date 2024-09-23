@@ -256,3 +256,28 @@ TEST_F(UserAppTest, CanHandlePost)
     app->stop();
     app->wait();
 }
+
+TEST_F(UserAppTest, CanHandleEditPostFrontEnd)
+{
+    Post p;
+    p.title = "aaa";
+    p.abstract = "bbb";
+    p.language = "ccc";
+    p.markup = Post::COMMONMARK;
+    p.raw_content = "ddd";
+    p.author = "mw";
+    p.id = 1;
+
+    EXPECT_CALL(*data_source, getPost(1)).WillOnce(Return(p));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res, client.get(
+            HTTPRequest("http://localhost:8080/blog/edit-post/1")
+            .addHeader("Cookie", "access-token=aaa")));
+
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+    }
+    app->stop();
+    app->wait();
+}

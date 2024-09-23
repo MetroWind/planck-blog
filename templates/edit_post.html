@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include "head.html" %}
+    <title>Edit Post</title>
+  </head>
+  <body>
+    <div id="Body">
+      {% include "nav.html" %}
+      <header id="BlogTitle">
+        <h1>{{ blog_title }}</h1>
+      </header>
+
+      <form>
+        <table>
+          <colgroup>
+            <col id="ColumnLabel" />
+            <col id="ColumnValue" />
+          </colgroup>
+          <tr>
+            <td><label for="title">Title</label></td>
+            <td><input type="text" name="title" id="TextTitle" value="{{ post.title }}" required /></td>
+          </tr>
+          <tr>
+            <td><label for="language">Language</label></td>
+            <td><select name="language" id="DropDownLanguage" value="{{ post.language }}">
+                {% for lang in languages %}
+                <option value="{{ lang }}">{{ lang }}</option>
+                {% endfor %}
+            </select></td>
+          </tr>
+          <tr>
+            <td><label for="markup">Markup</label></td>
+            <td><select name="markup" id="DropDownMarkup" value="{{ post.markup }}">
+                <option value="CommonMark">CommonMark</option>
+                <option value="AsciiDoc">AsciiDoc</option>
+            </select></td>
+          </tr>
+        </table>
+        <div><label for="abstract">Abstract:</label></div>
+        <div>
+          <textarea id="TextAbstract" name="abstract" required>
+            {{ post.abstract }}
+          </textarea>
+        </div>
+        <div>
+          <textarea id="TextContent" name="content" required>
+            {{ post.content }}
+          </textarea>
+        </div>
+        <div id="ButtonBar">
+          <input type="submit" value="Save" formaction="{{ url_for("save-post") }}" formmethod="post" formtarget="_self" />
+        </div>
+      </form>
+    </div>
+  </body>
+</html>

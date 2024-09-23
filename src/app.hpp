@@ -37,9 +37,14 @@ public:
                               httplib::Response& res) const;
     void handlePost(const httplib::Request& req, httplib::Response& res);
     void handleDrafts(const httplib::Request& req, httplib::Response& res);
-    void handleCreatePostFrontEnd(const httplib::Request& req, httplib::Response& res);
-    void handleCreateDraft(const httplib::Request& req, httplib::Response& res) const;
-    void handlePublishFromNewDraft(const httplib::Request& req, httplib::Response& res) const;
+    void handleCreatePostFrontEnd(const httplib::Request& req,
+                                  httplib::Response& res);
+    void handleCreateDraft(const httplib::Request& req, httplib::Response& res)
+        const;
+    void handleEditPostFrontEnd(const httplib::Request& req,
+                                httplib::Response& res);
+    void handlePublishFromNewDraft(const httplib::Request& req,
+                                   httplib::Response& res) const;
 
     void start();
     void stop();
@@ -80,6 +85,7 @@ private:
         const httplib::Request& req, httplib::Response& res,
         bool allow_error_and_invalid=false) const;
 
+    nlohmann::json postToJson(const Post& p) const;
     E<nlohmann::json> renderPostToJson(Post&& p);
 
     // This gives a path, optionally with the name of an argument,

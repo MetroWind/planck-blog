@@ -306,6 +306,10 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     {
         return URL(base_url).appendPath("create-post").str();
     }
+    if(name == "edit-post")
+    {
+        return URL(base_url).appendPath("edit-post").appendPath(arg).str();
+    }
     if(name == "edit-draft")
     {
         return URL(base_url).appendPath("edit-draft").appendPath(arg).str();
@@ -314,6 +318,10 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     if(name == "save-draft")
     {
         return URL(base_url).appendPath("save-draft").str();
+    }
+    if(name == "save-post")
+    {
+        return URL(base_url).appendPath("save-post").str();
     }
     if(name == "publish-from-new-draft")
     {
@@ -457,6 +465,36 @@ void App::handleCreateDraft(const httplib::Request& req,
     res.set_redirect(urlFor("edit-draft", std::to_string(id)));
 }
 
+void App::handleEditPostFrontEnd(const httplib::Request& req,
+                                 httplib::Response& res)
+{
+    ASSIGN_OR_RESPOND_ERROR(
+        int64_t id, strToNumber<int64_t>(req.path_params.at("id")).or_else(
+            []([[maybe_unused]] auto _) -> E<int64_t>
+            {
+                return std::unexpected(httpError(401, "Invalid post ID"));
+            }), res);
+
+    auto session = prepareSession(req, res);
+    if(!session.has_value()) return;
+
+    ASSIGN_OR_RESPOND_ERROR(std::optional<Post> p, data->getPost(id), res);
+    if(!p.has_value())
+    {
+        res.status = 404;
+        res.set_content("Post not found", "text/plain");
+        return;
+    }
+
+    nlohmann::json data{{"blog_title", config.blog_title},
+                        {"languages", config.languages},
+                        {"session_user", session->user.name},
+                        {"post", postToJson(*p)}};
+    std::string result = templates.render_file(
+        "edit_post.html", std::move(data));
+    res.set_content(result, "text/html");
+}
+
 void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Response& res)
     const
 {
@@ -474,30 +512,17 @@ void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Respon
     res.set_redirect(urlFor("post", std::to_string(id)));
 }
 
-E<nlohmann::json> App::renderPostToJson(Post&& p)
+nlohmann::json App::postToJson(const Post& p) const
 {
     nlohmann::json result;
     if(p.id.has_value())
     {
-        result["id"] = std::to_string(*p.id);
+        result["id"] = *p.id;
     }
     result["markup"] = Post::markupToStr(p.markup);
     result["title"] = p.title;
     result["abstract"] = p.abstract;
-    // Do template substitution in the post content. This allows
-    // writer to write {{ url_for(...) }} in the post.
-    nlohmann::json data;
-    try
-    {
-        p.raw_content = templates.render(p.raw_content, std::move(data));
-    }
-    catch(const inja::InjaError& e)
-    {
-        return std::unexpected(runtimeError(
-            std::format("Blog content failed to render: {}", e.message)));
-    }
-
-    ASSIGN_OR_RETURN(result["content"], post_cache.renderPost(p));
+    result["content"] = p.raw_content;
     if(p.publish_time.has_value())
     {
         result["publish_time"] = timeToSeconds(*p.publish_time);
@@ -529,6 +554,29 @@ E<nlohmann::json> App::renderPostToJson(Post&& p)
     result["language"] = p.language;
     result["author"] = p.author;
 
+    return result;
+}
+
+E<nlohmann::json> App::renderPostToJson(Post&& p)
+{
+    nlohmann::json result = postToJson(p);
+    if(p.id.has_value())
+    {
+        result["id"] = std::to_string(*p.id);
+    }
+    // Do template substitution in the post content. This allows
+    // writer to write {{ url_for(...) }} in the post.
+    nlohmann::json data;
+    try
+    {
+        p.raw_content = templates.render(p.raw_content, std::move(data));
+    }
+    catch(const inja::InjaError& e)
+    {
+        return std::unexpected(runtimeError(
+            std::format("Blog content failed to render: {}", e.message)));
+    }
+    ASSIGN_OR_RETURN(result["content"], post_cache.renderPost(p));
     return result;
 }
 
@@ -600,6 +648,11 @@ void App::start()
                [&](const httplib::Request& req, httplib::Response& res)
     {
         handleCreatePostFrontEnd(req, res);
+    });
+    server.Get(getPath("edit-post", "id"),
+               [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleEditPostFrontEnd(req, res);
     });
     server.Post(getPath("save-draft"),
                 [&](const httplib::Request& req, httplib::Response& res)
