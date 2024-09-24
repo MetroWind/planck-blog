@@ -18,6 +18,10 @@
             <col id="ColumnValue" />
           </colgroup>
           <tr>
+            <td><label for="title">Post ID</label></td>
+            <td><input type="text" name="id" id="TextID" value="{{ post.id }}" readonly /></td>
+          </tr>
+          <tr>
             <td><label for="title">Title</label></td>
             <td><input type="text" name="title" id="TextTitle" value="{{ post.title }}" required /></td>
           </tr>

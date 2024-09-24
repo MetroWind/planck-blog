@@ -281,3 +281,33 @@ TEST_F(UserAppTest, CanHandleEditPostFrontEnd)
     app->stop();
     app->wait();
 }
+
+TEST_F(UserAppTest, CanHandleSavePost)
+{
+    Post p;
+    p.title = "aaa";
+    p.abstract = "bbb";
+    p.language = "ccc";
+    p.markup = Post::COMMONMARK;
+    p.raw_content = "ddd";
+    p.author = "mw";
+    p.id = 1;
+
+    EXPECT_CALL(*data_source, updatePost(std::move(p)))
+        .WillOnce(Return(E<void>()));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res, client.post(
+            HTTPRequest("http://localhost:8080/blog/save-post").setPayload(
+                "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
+                "content=ddd&id=1")
+            .addHeader("Cookie", "access-token=aaa")
+            .setContentType("application/x-www-form-urlencoded")));
+
+        EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
+        EXPECT_EQ(res->header.at("Location"), "http://localhost:8080/blog/p/1");
+    }
+    app->stop();
+    app->wait();
+}

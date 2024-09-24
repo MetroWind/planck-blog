@@ -495,6 +495,31 @@ void App::handleEditPostFrontEnd(const httplib::Request& req,
     res.set_content(result, "text/html");
 }
 
+void App::handleSavePost(const httplib::Request& req, httplib::Response& res)
+    const
+{
+    auto session = prepareSession(req, res);
+    if(!session.has_value()) return;
+
+    ASSIGN_OR_RESPOND_ERROR(Post p, formToPost(req, session->user.name), res);
+    if(!p.id.has_value())
+    {
+        res.status = 400;
+        res.set_content("Post should have an ID.", "text/plain");
+        return;
+    }
+
+    auto maybe_error = data->updatePost(std::move(p));
+    if(!maybe_error.has_value())
+    {
+        res.status = 500;
+        res.set_content(std::string("Failed to save post: ") +
+                        errorMsg(maybe_error.error()), "text/plain");
+        return;
+    }
+    res.set_redirect(urlFor("post", std::to_string(*p.id)));
+}
+
 void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Response& res)
     const
 {
@@ -599,6 +624,11 @@ E<Post> App::formToPost(const httplib::Request& req, std::string_view author) co
     {
         return std::unexpected(httpError(400, "Invalid markup"));
     }
+    if(req.has_param("id"))
+    {
+        ASSIGN_OR_RETURN(
+            draft.id, strToNumber<int64_t>(req.get_param_value("id")));
+    }
     draft.title = req.get_param_value("title");
     draft.abstract = req.get_param_value("abstract");
     draft.raw_content = req.get_param_value("content");
@@ -653,6 +683,11 @@ void App::start()
                [&](const httplib::Request& req, httplib::Response& res)
     {
         handleEditPostFrontEnd(req, res);
+    });
+    server.Post(getPath("save-post"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleSavePost(req, res);
     });
     server.Post(getPath("save-draft"),
                 [&](const httplib::Request& req, httplib::Response& res)

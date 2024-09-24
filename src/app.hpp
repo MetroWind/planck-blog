@@ -43,6 +43,8 @@ public:
         const;
     void handleEditPostFrontEnd(const httplib::Request& req,
                                 httplib::Response& res);
+    void handleSavePost(const httplib::Request& req, httplib::Response& res)
+        const;
     void handlePublishFromNewDraft(const httplib::Request& req,
                                    httplib::Response& res) const;
 
