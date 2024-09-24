@@ -1,0 +1,6 @@
+= Planck
+A naively simple blog server that is barely enough
+
+image::https://img.shields.io/github/check-runs/MetroWind/planck-blog/master?label=Tests[CI badge]
+
+I’m just a badge :->
