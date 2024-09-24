@@ -1,0 +1,10 @@
+--- build/_deps/cryptopp_cmake-src/cryptopp/CMakeLists.txt	2024-09-24 13:04:43.013793813 -0700
++++ build/_deps/cryptopp_cmake-src/cryptopp/CMakeLists.txt.new	2024-09-24 13:04:38.243833981 -0700
+@@ -1402,7 +1402,6 @@
+ target_include_directories(
+     cryptopp
+     PUBLIC
+-        $<BUILD_INTERFACE:${cryptopp_SOURCE_DIR}>
+         $<BUILD_INTERFACE:${CRYPTOPP_PREFIXED_INCLUDE_DIR}>
+         $<INSTALL_INTERFACE:include>
+ )

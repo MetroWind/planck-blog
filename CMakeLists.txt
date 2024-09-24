@@ -18,7 +18,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   httplib
   GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-  GIT_TAG v0.14.3
+  GIT_TAG v0.18.0
 )
 FetchContent_Declare(
   ryml
@@ -46,6 +46,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/gabime/spdlog.git
   GIT_TAG v1.12.0
 )
+
 set(SPDLOG_USE_STD_FORMAT ON)
 FetchContent_MakeAvailable(json inja httplib cxxopts googletest ryml spdlog)
 unset(BUILD_BENCHMARK)
@@ -55,7 +56,15 @@ find_package(SQLite3 REQUIRED)
 find_package(cmark REQUIRED)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(cryptopp REQUIRED libcryptopp)
+pkg_check_modules(libmagic REQUIRED libmagic)
+
+FetchContent_Declare(
+  # This name can be anything but “cryptopp”.
+  cryptopp_cmake
+  GIT_REPOSITORY https://github.com/abdes/cryptopp-cmake.git
+)
+set(CRYPTOPP_BUILD_TESTING OFF)
+FetchContent_MakeAvailable(cryptopp_cmake)
 
 set(SOURCE_FILES
   src/app.cpp
@@ -84,6 +93,7 @@ set(SOURCE_FILES
   src/utils.hpp
   src/attachment.hpp
 )
+
 set(LIBS
   cxxopts
   httplib
@@ -91,7 +101,7 @@ set(LIBS
   ryml::ryml
   ${CURL_LIBRARIES}
   ${SQLite3_LIBRARIES}
-  ${cryptopp_LIBRARIES}
+  cryptopp::cryptopp
   # This can be found in the installed
   # cmark-targets-relwithdebinfo.cmake.
   cmark::cmark
@@ -103,7 +113,6 @@ set(INCLUDES
   ${inja_SOURCE_DIR}/single_include/inja
   ${SQLite3_INCLUDE_DIRS}
   ${cmark_INCLUDE_DIRS}
-  ${cryptopp_INCLUDE_DIRS}
 )
 
 add_executable(nsblog ${SOURCE_FILES} src/main.cpp)
