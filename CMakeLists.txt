@@ -69,6 +69,8 @@ FetchContent_MakeAvailable(cryptopp_cmake)
 set(SOURCE_FILES
   src/app.cpp
   src/app.hpp
+  src/attachment.cpp
+  src/attachment.hpp
   src/auth.cpp
   src/auth.hpp
   src/config.cpp
@@ -102,6 +104,7 @@ set(LIBS
   ${CURL_LIBRARIES}
   ${SQLite3_LIBRARIES}
   cryptopp::cryptopp
+  ${libmagic_LIBRARIES}
   # This can be found in the installed
   # cmark-targets-relwithdebinfo.cmake.
   cmark::cmark
@@ -113,6 +116,7 @@ set(INCLUDES
   ${inja_SOURCE_DIR}/single_include/inja
   ${SQLite3_INCLUDE_DIRS}
   ${cmark_INCLUDE_DIRS}
+  ${libmagic_INCLUDE_DIRS}
 )
 
 add_executable(nsblog ${SOURCE_FILES} src/main.cpp)
