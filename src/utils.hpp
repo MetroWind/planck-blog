@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <string>
 #include <string_view>
@@ -106,4 +108,12 @@ E<NumType> strToNumber(std::string_view s)
             "Failed to convert string to number"));
     }
     std::unreachable();
+}
+
+// Lower case a string in-place.
+inline std::string& toLower(std::string& s)
+{
+    std::transform(s.begin(), s.end(), s.begin(),
+    [](unsigned char c){ return std::tolower(c); });
+    return s;
 }

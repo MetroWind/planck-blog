@@ -54,6 +54,9 @@ find_package(CURL REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(cmark REQUIRED)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(cryptopp REQUIRED libcryptopp)
+
 set(SOURCE_FILES
   src/app.cpp
   src/app.hpp
@@ -65,6 +68,8 @@ set(SOURCE_FILES
   src/data.hpp
   src/database.cpp
   src/database.hpp
+  src/hash.cpp
+  src/hash.hpp
   src/error.hpp
   src/exec.cpp
   src/exec.hpp
@@ -86,6 +91,7 @@ set(LIBS
   ryml::ryml
   ${CURL_LIBRARIES}
   ${SQLite3_LIBRARIES}
+  ${cryptopp_LIBRARIES}
   # This can be found in the installed
   # cmark-targets-relwithdebinfo.cmake.
   cmark::cmark
@@ -97,6 +103,7 @@ set(INCLUDES
   ${inja_SOURCE_DIR}/single_include/inja
   ${SQLite3_INCLUDE_DIRS}
   ${cmark_INCLUDE_DIRS}
+  ${cryptopp_INCLUDE_DIRS}
 )
 
 add_executable(nsblog ${SOURCE_FILES} src/main.cpp)
@@ -115,6 +122,7 @@ set(TEST_FILES
   src/data_test.cpp
   src/database_test.cpp
   src/exec_test.cpp
+  src/hash_test.cpp
   src/http_client_mock.hpp
   src/http_client_test.cpp
   src/post_rendering_test.cpp
