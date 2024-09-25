@@ -249,9 +249,9 @@ TEST_F(UserAppTest, CanHandlePost)
                        client.get(HTTPRequest("http://localhost:8080/blog/p/1")
                                   .addHeader("Cookie", "access-token=aaa")));
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
-        EXPECT_TRUE(res->payloadAsStr().contains("<h1>aaa</h1>"));
-        EXPECT_TRUE(res->payloadAsStr().contains(
-            "ddd http://localhost:8080/blog eee"));
+        EXPECT_THAT(res->payloadAsStr(), HasSubstr("<h1>aaa</h1>"));
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("ddd http://localhost:8080/blog eee"));
     }
     app->stop();
     app->wait();

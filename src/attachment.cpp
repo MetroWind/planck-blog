@@ -13,8 +13,12 @@ namespace {
 // fails, return “application/octet-stream”.
 std::string probeMimeType(std::string_view bytes)
 {
-    magic_t cookie = magic_open(MAGIC_MIME);
+    magic_t cookie = magic_open(MAGIC_MIME_TYPE);
     if(cookie == nullptr)
+    {
+        return "application/octet-stream";
+    }
+    if(magic_load(cookie, nullptr) != 0)
     {
         return "application/octet-stream";
     }

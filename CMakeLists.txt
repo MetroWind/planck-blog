@@ -129,6 +129,7 @@ target_link_libraries(nsblog PRIVATE ${LIBS})
 
 set(TEST_FILES
   src/app_test.cpp
+  src/attachment_test.cpp
   src/auth_mock.hpp
   src/auth_test.cpp
   src/data_mock.hpp
@@ -136,6 +137,7 @@ set(TEST_FILES
   src/database_test.cpp
   src/exec_test.cpp
   src/hash_test.cpp
+  src/hash_mock.hpp
   src/http_client_mock.hpp
   src/http_client_test.cpp
   src/post_rendering_test.cpp
