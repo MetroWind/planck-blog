@@ -57,6 +57,8 @@
     _ASSIGN_OR_RESPOND_ERROR(_CONCAT_NAMES(assign_or_return_tmp, __COUNTER__), \
                             var, val, res)
 
+namespace fs = std::filesystem;
+
 namespace {
 std::unordered_map<std::string, std::string> parseCookies(std::string_view value)
 {
@@ -587,7 +589,6 @@ void App::handleAttachment(const httplib::Request& req, httplib::Response& res)
         return;
     }
 
-    namespace fs = std::filesystem;
     auto path = fs::path(config.attachment_dir) / attachment_manager.path(*att);
     if(!fs::exists(path))
     {
@@ -600,6 +601,59 @@ void App::handleAttachment(const httplib::Request& req, httplib::Response& res)
     std::string data(std::istreambuf_iterator<char>{file}, {});
     file.close();
     res.set_content(data, att->content_type);
+}
+
+void App::handleAttachmentUpload(const httplib::Request& req,
+                                 httplib::Response& res) const
+{
+    auto session = prepareSession(req, res);
+    if(!session) return;
+
+    if(!req.has_file("file"))
+    {
+        res.status = 400;
+        res.set_content("File expected", "text/plain");
+        return;
+    }
+    const auto& file = req.get_file_value("file");
+    Attachment att = attachment_manager.attachmentFromBytes(
+        file.content, file.filename, file.content_type);
+    fs::path path = fs::path(config.attachment_dir) /
+        attachment_manager.path(att);
+    spdlog::debug("Adding attachment to {}...", path.string());
+    fs::path dir = path.parent_path();
+    if(!fs::exists(dir))
+    {
+        if(!fs::create_directory(dir))
+        {
+            res.status = 500;
+            res.set_content("Failed to create directory for attachment",
+                            "text/plain");
+            return;
+        }
+    }
+    std::ofstream att_file(path);
+    try
+    {
+        att_file.write(file.content.data(), file.content.size());
+    }
+    catch(const std::ios_base::failure& e)
+    {
+        res.status = 500;
+        res.set_content(std::format("Failed to write attachment: {}", e.what()),
+                        "text/plain");
+        return;
+    }
+    att_file.close();
+    E<void> error_maybe = data->addAttachment(std::move(att));
+    if(!error_maybe)
+    {
+        fs::remove(path);
+        res.status = 500;
+        res.set_content(errorMsg(error_maybe.error()), "text/plain");
+        return;
+    }
+    res.set_redirect(urlFor("attachments"));
 }
 
 nlohmann::json App::postToJson(const Post& p) const
@@ -771,6 +825,11 @@ void App::start()
                 [&](const httplib::Request& req, httplib::Response& res)
     {
         handleAttachment(req, res);
+    });
+    server.Post(getPath("upload-attachment"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleAttachmentUpload(req, res);
     });
 
     spdlog::info("Listening at http://{}:{}/...", config.listen_address,

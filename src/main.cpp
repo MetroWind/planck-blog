@@ -10,12 +10,14 @@
 #include "config.hpp"
 #include "data.hpp"
 #include "http_client.hpp"
+#include "spdlog/common.h"
 #include "spdlog/spdlog.h"
 #include "utils.hpp"
 #include "url.hpp"
 
 int main(int argc, char** argv)
 {
+    spdlog::set_level(spdlog::level::debug);
     cxxopts::Options cmd_options("NS Weekly", "Naively simple weekly snippet");
     cmd_options.add_options()
         ("c,config", "Config file",
@@ -66,6 +68,7 @@ int main(int argc, char** argv)
 
     App app(*conf, *std::move(auth), *std::move(data_source));
     app.start();
+    app.wait();
 
     return 0;
 }

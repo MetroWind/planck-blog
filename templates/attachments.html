@@ -7,6 +7,15 @@
   <body>
     <div id="Body">
       {% include "nav.html" %}
+
+      <form method="post" enctype="multipart/form-data" action="{{ url_for("upload-attachment") }}">
+        <div>
+          <label for="file">Upload an attachment</label>
+          <input type="file" id="FilePicker" name="file" />
+          <input type="submit" value="Upload" />
+        </div>
+      </form>
+
       <table id="AttachmentTable">
         <tr>
           <th>Hash</th><th>Filename</th><th>Type</th><th>Upload time</th>

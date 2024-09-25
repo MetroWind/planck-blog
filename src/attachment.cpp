@@ -35,11 +35,19 @@ std::string probeMimeType(std::string_view bytes)
 } // namespace
 
 Attachment AttachmentManager::attachmentFromBytes(
-    const std::string& bytes, std::string_view filename) const
+    const std::string& bytes, std::string_view filename,
+    std::string_view content_type) const
 {
     Attachment att;
     att.hash = hasher.hashToHexStr(bytes);
-    att.content_type = probeMimeType(bytes);
+    if(!content_type.empty())
+    {
+        att.content_type = content_type;
+    }
+    else
+    {
+        att.content_type = probeMimeType(bytes);
+    }
     att.original_name = filename;
     return att;
 }
