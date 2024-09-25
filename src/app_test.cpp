@@ -27,6 +27,7 @@ protected:
         config.listen_address = "localhost";
         config.listen_port = 8080;
         config.data_dir = ".";
+        config.attachment_dir = "test-data";
         config.blog_title = "Test Blog";
 
         auto auth = std::make_unique<AuthMock>();
@@ -335,6 +336,28 @@ TEST_F(UserAppTest, CanHandleAttachments)
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_THAT(res->payloadAsStr(), HasSubstr(
             R"(<a href="http://localhost:8080/blog/attachment/xyz/aaa.txt">)"));
+    }
+    app->stop();
+    app->wait();
+}
+
+TEST_F(UserAppTest, CanHandleAttachment)
+{
+    Attachment att;
+    att.content_type = "image/png";
+    att.hash = "xyz";
+    att.original_name = "test.png";
+    att.upload_time = Clock::now();
+
+    EXPECT_CALL(*data_source, getAttachment("xyz")).WillOnce(Return(att));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res,
+                       client.get("http://localhost:8080/blog/attachment/xyz/test.png"));
+
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+        EXPECT_EQ(res->payloadAsStr().size(), 313);
     }
     app->stop();
     app->wait();

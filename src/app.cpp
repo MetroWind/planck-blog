@@ -2,7 +2,9 @@
 #include <ctime>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <memory>
 #include <regex>
 #include <sstream>
@@ -572,6 +574,34 @@ void App::handleAttachments(const httplib::Request& req, httplib::Response& res)
     res.set_content(result, "text/html");
 }
 
+void App::handleAttachment(const httplib::Request& req, httplib::Response& res)
+{
+    ASSIGN_OR_RESPOND_ERROR(
+        std::optional<Attachment> att,
+        data->getAttachment(req.path_params.at("hash")),
+        res);
+    if(!att.has_value())
+    {
+        res.status = 404;
+        res.set_content("Attachment not found", "text/plain");
+        return;
+    }
+
+    namespace fs = std::filesystem;
+    auto path = fs::path(config.attachment_dir) / attachment_manager.path(*att);
+    if(!fs::exists(path))
+    {
+        res.status = 404;
+        res.set_content("File not found", "text/plain");
+        return;
+    }
+
+    std::ifstream file(path);
+    std::string data(std::istreambuf_iterator<char>{file}, {});
+    file.close();
+    res.set_content(data, att->content_type);
+}
+
 nlohmann::json App::postToJson(const Post& p) const
 {
     nlohmann::json result;
@@ -736,6 +766,11 @@ void App::start()
                 [&](const httplib::Request& req, httplib::Response& res)
     {
         handleAttachments(req, res);
+    });
+    server.Get(getPath("attachment", "hash/:_"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleAttachment(req, res);
     });
 
     spdlog::info("Listening at http://{}:{}/...", config.listen_address,

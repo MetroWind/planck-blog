@@ -52,6 +52,10 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     {
         tree["data-dir"] >> config.data_dir;
     }
+    if(tree["attachment-dir"].has_key())
+    {
+        tree["attachment-dir"] >> config.attachment_dir;
+    }
     if(tree["listen-address"].has_key())
     {
         tree["listen-address"] >> config.listen_address;

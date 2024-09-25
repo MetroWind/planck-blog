@@ -50,6 +50,7 @@ public:
     void handlePublishFromNewDraft(const httplib::Request& req,
                                    httplib::Response& res) const;
     void handleAttachments(const httplib::Request& req, httplib::Response& res);
+    void handleAttachment(const httplib::Request& req, httplib::Response& res);
 
     void start();
     void stop();

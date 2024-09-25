@@ -13,6 +13,7 @@ struct Configuration
     using StringMap = std::unordered_map<std::string, std::string>;
 
     std::string data_dir;
+    std::string attachment_dir;
     std::string listen_address;
     int listen_port;
     std::string client_id;
