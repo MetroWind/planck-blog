@@ -1,10 +1,12 @@
-#include "gmock/gmock.h"
 #include <httplib.h>
 #include <memory>
+#include <vector>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "app.hpp"
+#include "attachment.hpp"
 #include "auth.hpp"
 #include "config.hpp"
 #include "auth_mock.hpp"
@@ -307,6 +309,32 @@ TEST_F(UserAppTest, CanHandleSavePost)
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
         EXPECT_EQ(res->header.at("Location"), "http://localhost:8080/blog/p/1");
+    }
+    app->stop();
+    app->wait();
+}
+
+TEST_F(UserAppTest, CanHandleAttachments)
+{
+    Attachment att;
+    att.content_type = "text/plain";
+    att.hash = "xyz";
+    att.original_name = "aaa.txt";
+    att.upload_time = Clock::now();
+    std::vector<Attachment> atts;
+    atts.push_back(std::move(att));
+
+    EXPECT_CALL(*data_source, getAttachments()).WillOnce(Return(atts));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res, client.get(
+            HTTPRequest("http://localhost:8080/blog/attachments")
+            .addHeader("Cookie", "access-token=aaa")));
+
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+        EXPECT_THAT(res->payloadAsStr(), HasSubstr(
+            R"(<a href="http://localhost:8080/blog/attachment/xyz/aaa.txt">)"));
     }
     app->stop();
     app->wait();

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include "head.html" %}
+    <title>Attachments</title>
+  </head>
+  <body>
+    <div id="Body">
+      {% include "nav.html" %}
+      <table id="AttachmentTable">
+        <tr>
+          <th>Hash</th><th>Filename</th><th>Type</th><th>Upload time</th>
+        </tr>
+        {% for att in attachments %}
+        <tr>
+          <td class="Hash"><a href="{{ att.url }}">{{ att.hash }}</a></td>
+          <td class="Filename">{{ att.original_name }}</td>
+          <td class="ContentType">{{ att.content_type }}</td>
+          <td><time datetime="{{ att.upload_time_iso8601 }}">
+              {{ att.upload_time_str }}
+          </time></td>
+        </tr>
+        {% endfor %}
+      </ul>
+    </div>
+  </body>
+</html>

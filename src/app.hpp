@@ -1,23 +1,25 @@
 #pragma once
 
 #include <atomic>
+#include <format>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <format>
-#include <optional>
 
 #include <httplib.h>
 #include <spdlog/spdlog.h>
 #include <inja.hpp>
 
+#include "attachment.hpp"
 #include "auth.hpp"
 #include "config.hpp"
 #include "data.hpp"
+#include "hash.hpp"
 #include "http_client.hpp"
-#include "utils.hpp"
-#include "url.hpp"
 #include "post_rendering.hpp"
+#include "url.hpp"
+#include "utils.hpp"
 
 void copyToHttplibReq(const HTTPRequest& src, httplib::Request& dest);
 
@@ -47,6 +49,7 @@ public:
         const;
     void handlePublishFromNewDraft(const httplib::Request& req,
                                    httplib::Response& res) const;
+    void handleAttachments(const httplib::Request& req, httplib::Response& res);
 
     void start();
     void stop();
@@ -107,6 +110,8 @@ private:
     inja::Environment templates;
     std::unique_ptr<AuthInterface> auth;
     std::unique_ptr<DataSourceInterface> data;
+    std::unique_ptr<HasherInterface> hasher;
+    AttachmentManager attachment_manager;
     PostCache post_cache;
     URL base_url;
     std::atomic<bool> should_stop;

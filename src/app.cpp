@@ -1,16 +1,16 @@
 #include <algorithm>
+#include <ctime>
 #include <exception>
+#include <filesystem>
+#include <iomanip>
 #include <memory>
+#include <regex>
+#include <sstream>
 #include <sstream>
 #include <string>
-#include <regex>
 #include <thread>
 #include <variant>
-#include <filesystem>
 #include <vector>
-#include <sstream>
-#include <iomanip>
-#include <ctime>
 
 #include <inja.hpp>
 #include <httplib.h>
@@ -18,13 +18,15 @@
 #include <spdlog/spdlog.h>
 
 #include "app.hpp"
+#include "attachment.hpp"
 #include "auth.hpp"
 #include "config.hpp"
 #include "error.hpp"
+#include "hash.hpp"
 #include "http_client.hpp"
+#include "post.hpp"
 #include "url.hpp"
 #include "utils.hpp"
-#include "post.hpp"
 
 #define _ASSIGN_OR_RESPOND_ERROR(tmp, var, val, res)                    \
     auto tmp = val;                                                     \
@@ -241,6 +243,8 @@ App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
                     .string()),
           auth(std::move(openid_auth)),
           data(std::move(data_source)),
+          hasher(std::make_unique<Sha256HalfHasher>()),
+          attachment_manager(*hasher),
           post_cache(conf),
           base_url(),
           should_stop(false)
@@ -537,6 +541,37 @@ void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Respon
     res.set_redirect(urlFor("post", std::to_string(id)));
 }
 
+void App::handleAttachments(const httplib::Request& req, httplib::Response& res)
+{
+    auto session = prepareSession(req, res);
+    if(!session) return;
+
+    ASSIGN_OR_RESPOND_ERROR(
+        std::vector<Attachment> atts, data->getAttachments(), res);
+
+    nlohmann::json atts_json = nlohmann::json::array();
+    for(const Attachment& att: atts)
+    {
+        atts_json.push_back({
+                { "original_name", att.original_name },
+                { "hash", att.hash },
+                { "upload_time", timeToSeconds(att.upload_time) },
+                { "upload_time_str", timeToStr(att.upload_time) },
+                { "upload_time_iso8601", timeToISO8601(att.upload_time) },
+                { "content_type", att.content_type },
+                { "url", urlFor("attachment",
+                                att.hash + "/" + att.original_name) }
+            });
+    }
+
+    nlohmann::json data{{"attachments", std::move(atts_json)},
+                        {"session_user", session->user.name}};
+
+    std::string result = templates.render_file(
+        "attachments.html", std::move(data));
+    res.set_content(result, "text/html");
+}
+
 nlohmann::json App::postToJson(const Post& p) const
 {
     nlohmann::json result;
@@ -551,9 +586,8 @@ nlohmann::json App::postToJson(const Post& p) const
     if(p.publish_time.has_value())
     {
         result["publish_time"] = timeToSeconds(*p.publish_time);
-        result["publish_time_str"] = std::format("{:%F %R}", *p.publish_time);
-        result["publish_time_iso8601"] =
-            std::format("{:%FT%R%z}", *p.publish_time);
+        result["publish_time_str"] = timeToStr(*p.publish_time);
+        result["publish_time_iso8601"] = timeToISO8601(*p.publish_time);
     }
     else
     {
@@ -565,9 +599,8 @@ nlohmann::json App::postToJson(const Post& p) const
     if(p.update_time.has_value())
     {
         result["update_time"] = timeToSeconds(*p.update_time);
-        result["update_time_str"] = std::format("{:%F %R}", *p.update_time);
-        result["update_time_iso8601"] =
-            std::format("{:%FT%R%z}", *p.update_time);
+        result["update_time_str"] = timeToStr(*p.update_time);
+        result["update_time_iso8601"] = timeToISO8601(*p.update_time);
     }
     else
     {
@@ -694,11 +727,15 @@ void App::start()
     {
         handleCreateDraft(req, res);
     });
-
     server.Post(getPath("publish-from-new-draft"),
                 [&](const httplib::Request& req, httplib::Response& res)
     {
         handlePublishFromNewDraft(req, res);
+    });
+    server.Get(getPath("attachments"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleAttachments(req, res);
     });
 
     spdlog::info("Listening at http://{}:{}/...", config.listen_address,

@@ -3,10 +3,11 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <filesystem>
+#include <format>
+#include <stdio.h>
 #include <string>
 #include <string_view>
-#include <filesystem>
-#include <stdio.h>
 #include <system_error>
 
 #include <nlohmann/json.hpp>
@@ -80,6 +81,16 @@ inline E<Time> strToDate(const std::string& s)
         return std::unexpected(runtimeError("Invalid date"));
     }
     return std::chrono::sys_days(date);
+}
+
+inline std::string timeToStr(const Time& t)
+{
+    return std::format("{:%F %R}", t);
+}
+
+inline std::string timeToISO8601(const Time& t)
+{
+    return std::format("{:%FT%R%z}", t);
 }
 
 template<typename NumType>
