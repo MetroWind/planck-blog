@@ -95,6 +95,8 @@ set(SOURCE_FILES
   src/utils.hpp
   src/attachment.hpp
   src/legacy-migration.hpp
+  src/theme.cpp
+  src/theme.hpp
 )
 
 set(LIBS
