@@ -164,11 +164,11 @@ E<int64_t> DataSourceSqlite::saveDraft(Post&& new_draft) const
         return std::unexpected(runtimeError("New draft should not have ID"));
     }
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
-        "INSERT INTO Posts (markup, title, abstract, content, language) VALUES "
-        "(?, ?, ?, ?, ?)"));
+        "INSERT INTO Posts (markup, title, abstract, content, language, author)"
+        " VALUES (?, ?, ?, ?, ?, ?)"));
     DO_OR_RETURN(sql.bind(
         static_cast<int>(new_draft.markup), new_draft.title, new_draft.abstract,
-        new_draft.raw_content, new_draft.language));
+        new_draft.raw_content, new_draft.language, new_draft.author));
     DO_OR_RETURN(db->execute(std::move(sql)));
     return db->lastInsertRowID();
 }
@@ -358,6 +358,23 @@ E<void> DataSourceSqlite::addAttachmentReferral(
         DO_OR_RETURN(sql.bind(attachment_hash, url));
         return db->execute(std::move(sql));
     }
+}
+
+E<void> DataSourceSqlite::forceSetPostTimes(
+    int64_t id, const Time& publish, const std::optional<Time>& update) const
+{
+    ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
+        "UPDATE Posts SET publish_time = ? WHERE id = ?;"));
+    DO_OR_RETURN(sql.bind(timeToSeconds(publish), id));
+    DO_OR_RETURN(db->execute(std::move(sql)));
+    if(update.has_value())
+    {
+        ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
+            "UPDATE Posts SET update_time = ? WHERE id = ?;"));
+        DO_OR_RETURN(sql.bind(timeToSeconds(*update), id));
+        DO_OR_RETURN(db->execute(std::move(sql)));
+    }
+    return {};
 }
 
 E<void> DataSourceSqlite::setSchemaVersion(int64_t v) const

@@ -10,6 +10,7 @@
 #include "config.hpp"
 #include "data.hpp"
 #include "http_client.hpp"
+#include "legacy-migration.hpp"
 #include "spdlog/common.h"
 #include "spdlog/spdlog.h"
 #include "utils.hpp"
@@ -22,6 +23,8 @@ int main(int argc, char** argv)
     cmd_options.add_options()
         ("c,config", "Config file",
          cxxopts::value<std::string>()->default_value("/etc/nsweekly.yaml"))
+        ("legacy-migration", "Migrate the legacy posts from a directory",
+         cxxopts::value<std::string>())
         ("h,help", "Print this message.");
     auto opts = cmd_options.parse(argc, argv);
 
@@ -36,8 +39,24 @@ int main(int argc, char** argv)
     auto conf = Configuration::fromYaml(std::move(config_file));
     if(!conf.has_value())
     {
-        spdlog::error("Failed to load configuration: {}", errorMsg(conf.error()));
+        spdlog::error("Failed to load configuration: {}",
+                      errorMsg(conf.error()));
         return 3;
+    }
+
+    if(opts.count("legacy-migration") == 1)
+    {
+        auto ok_maybe = migrate(
+            opts["legacy-migration"].as<std::string>(), *conf);
+        if(ok_maybe)
+        {
+            return 0;
+        }
+        else
+        {
+            spdlog::error(errorMsg(ok_maybe.error()));
+            return 1;
+        }
     }
 
     auto url_prefix = URL::fromStr(conf->base_url);

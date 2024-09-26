@@ -115,6 +115,8 @@ public:
     E<void> addAttachmentReferral(const std::string& attachment_hash,
                                   const std::string& url) const override;
 
+    E<void> forceSetPostTimes(int64_t id, const Time& publish,
+                              const std::optional<Time>& update) const;
     // Do not use.
     DataSourceSqlite() = default;
 

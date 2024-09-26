@@ -417,15 +417,12 @@ void App::handlePost(const httplib::Request& req, httplib::Response& res)
     }
 
     ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj, renderPostToJson(*std::move(p)), res);
-    spdlog::debug("aaa");
     nlohmann::json data{{"post", std::move(pj)},
                         {"blog_title", config.blog_title},
                         {"session_user", session->user.name}};
-    spdlog::debug(data.dump());
     std::string result = templates.render_file(
         "post.html", std::move(data));
-    spdlog::debug(result);
-    res.set_content(result, "text/html");
+    res.set_content(std::move(result), "text/html");
 }
 
 void App::handleDrafts(const httplib::Request& req, httplib::Response& res)
@@ -707,7 +704,8 @@ E<nlohmann::json> App::renderPostToJson(Post&& p)
         result["id"] = std::to_string(*p.id);
     }
     // Do template substitution in the post content. This allows
-    // writer to write {{ url_for(...) }} in the post.
+    // writer to write {{ url_for(...) }} in the post. If this fails,
+    // we’ll just use the post content as-is.
     nlohmann::json data;
     try
     {
@@ -715,8 +713,9 @@ E<nlohmann::json> App::renderPostToJson(Post&& p)
     }
     catch(const inja::InjaError& e)
     {
-        return std::unexpected(runtimeError(
-            std::format("Blog content failed to render: {}", e.message)));
+        spdlog::warn(
+            "Failed to do template substitution on the post content: {}",
+            e.message);
     }
     ASSIGN_OR_RETURN(result["content"], post_cache.renderPost(p));
     return result;

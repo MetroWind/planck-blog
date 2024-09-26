@@ -94,6 +94,7 @@ set(SOURCE_FILES
   src/url.hpp
   src/utils.hpp
   src/attachment.hpp
+  src/legacy-migration.hpp
 )
 
 set(LIBS
