@@ -1,0 +1,123 @@
+@import url("../../statics/fonts/iosevka-etoile/IosevkaEtoile.css");
+@import url("../../statics/fonts/iosevka/IosevkaSS10.css");
+
+body
+{
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: "Iosevka Etoile Web", "Source Han Sans", "Noto Sans CJK", sans-serif;
+    font-size: 19px;
+}
+
+nav
+{
+    background-color: var(--color-alt-bg);
+    font-size: 80%;
+    padding: 4px 1em;
+}
+
+a
+{
+    color: var(--color-accent);
+    text-decoration: underline;
+}
+
+a:hover
+{
+    color: var(--color-bg);
+    background-color: var(--color-accent);
+}
+
+code, pre
+{
+    font-family: "Iosevka SS10 Web", monospace;
+    font-size: 95%;
+}
+
+p
+{
+    margin: unset;
+    text-indent: 1.5em;
+}
+
+p:first-of-type, pre p, h2 + p, h3 + p, h4 + p, h5 + p, h6 + p
+{
+    text-indent: unset;
+}
+
+.paragraph > p
+{
+    text-indent: 1.5em;
+}
+
+.paragraph:first-of-type > p
+{
+    text-indent: unset;
+}
+
+#Post[lang^="zh-"] p, #Post[lang="zh"] p
+{
+    text-indent: 2em;
+}
+
+#Post[lang^="zh-"] li > p, #Post[lang="zh"] li > p
+{
+    text-indent: unset;
+}
+
+main, #BlogTitle
+{
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+#BlogTitle
+{
+    font-size: 2rem;
+    font-style: italic;
+}
+
+#PostList
+{
+    text-align: center;
+    list-style: none;
+}
+
+#PostList > li
+{
+    margin: 3.5em 0;
+}
+
+h1.PostTitle
+{
+    margin: 0.75em 0;
+}
+
+h1.PostTitle > a
+{
+    text-decoration: none;
+}
+
+#Post > h1
+{
+    text-align: center;
+    margin: 2.5em 0 1em 0;
+}
+
+#Post > #Metadata
+{
+    color: var(--color-thin);
+    font-size: 0.8rem;
+    text-align: center;
+    font-weight: bold;
+}
+
+#Post[lang^="zh-"], #Post[lang="zh"]
+{
+    line-height: 1.65;
+}
+
+#Post[lang^="zh-"] ul, #Post[lang^="zh-"] ol, #Post[lang="zh"] ul, #Post[lang="zh"] ol
+{
+    margin-left: 2em;
+}
