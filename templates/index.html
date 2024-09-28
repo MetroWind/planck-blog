@@ -16,8 +16,8 @@
       <main>
         <ul id="PostList">
           {% for post in posts %}
-          <li><hgroup>
-              <h1 class="PostTitle">{{ post.title }}</h1>
+          <li lang="{{ post.language }}"><hgroup>
+              <h1 class="PostTitle"><a href="{{ url_for("post", post.id) }}">{{ post.title }}</a></h1>
               <p class="Abstract">{{ post.abstract }}</p>
           </hgroup></li>
           {% endfor %}

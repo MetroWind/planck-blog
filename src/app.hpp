@@ -18,6 +18,7 @@
 #include "hash.hpp"
 #include "http_client.hpp"
 #include "post_rendering.hpp"
+#include "theme.hpp"
 #include "url.hpp"
 #include "utils.hpp"
 
@@ -53,6 +54,8 @@ public:
     void handleAttachment(const httplib::Request& req, httplib::Response& res);
     void handleAttachmentUpload(const httplib::Request& req,
                                 httplib::Response& res) const;
+    void handleSelectTheme(const httplib::Request& req, httplib::Response& res)
+        const;
 
     void start();
     void stop();
@@ -109,6 +112,9 @@ private:
     E<Post> formToPost(const httplib::Request& req, std::string_view author)
         const;
 
+    void setup();
+    nlohmann::json baseTemplateData(const httplib::Request&) const;
+
     const Configuration config;
     inja::Environment templates;
     std::unique_ptr<AuthInterface> auth;
@@ -116,7 +122,9 @@ private:
     std::unique_ptr<HasherInterface> hasher;
     AttachmentManager attachment_manager;
     PostCache post_cache;
+    ThemeManager theme_manager;
     URL base_url;
+    nlohmann::json static_template_data;
     std::atomic<bool> should_stop;
     std::thread server_thread;
     httplib::Server server;

@@ -21,8 +21,9 @@ struct Configuration
     std::string openid_url_prefix;
     std::string base_url;
     std::vector<std::string> languages;
-
     std::string blog_title;
+    std::string default_theme;
+
     StringMap vars;
     StringMap custom_vars;
 

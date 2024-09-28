@@ -1,4 +1,10 @@
 <nav>
+  <span><label for="SelectTheme">Theme</label>
+    <select name="theme" id="SelectTheme">
+      {% for theme in themes %}
+      <option value="{{ theme }}">{{ theme }}</option>
+      {% endfor %}
+    </select>
   <span>
     {% if length(session_user) > 0 %}
     {{ session_user }}

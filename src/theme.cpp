@@ -118,3 +118,13 @@ std::vector<std::filesystem::path> ThemeManager::stylesheets(
     std::reverse(result.begin(), result.end());
     return result;
 }
+
+std::vector<std::string> ThemeManager::themeNames() const
+{
+    std::vector<std::string> result;
+    for(const auto& theme_pair: themes)
+    {
+        result.push_back(theme_pair.first);
+    }
+    return result;
+}

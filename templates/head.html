@@ -4,4 +4,8 @@
 <link rel="apple-touch-icon" href="{{ url_for("statics", "icon-180.png") }}">
 <link rel="preconnect" href="https://rsms.me/" />
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-<link rel="stylesheet" href="{{ url_for("statics", "style.css") }}" />
+{% for sheet in stylesheets %}
+<link rel="stylesheet" href="{{ url_for("stylesheet", sheet) }}" />
+{% endfor %}
+<script>const SELECT_THEME_ENDPOINT = "{{ url_for("select-theme") }}";</script>
+<script defer src="{{ url_for("statics", "theme-selector.js") }}"></script>

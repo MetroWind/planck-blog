@@ -27,6 +27,7 @@
 #include "hash.hpp"
 #include "http_client.hpp"
 #include "post.hpp"
+#include "theme.hpp"
 #include "url.hpp"
 #include "utils.hpp"
 
@@ -108,7 +109,7 @@ void setTokenCookies(const Tokens& tokens, httplib::Response& res)
         expire_sec = expire.count();
     }
     res.set_header("Set-Cookie", std::format(
-                       "access-token={}; Max-Age={}",
+                       "planck-blog-access-token={}; Max-Age={}",
                        urlEncode(tokens.access_token), expire_sec));
     // Add refresh token to cookie, with one month expiration.
     if(tokens.refresh_token.has_value())
@@ -122,7 +123,7 @@ void setTokenCookies(const Tokens& tokens, httplib::Response& res)
         }
 
         res.set_header("Set-Cookie", std::format(
-                           "refresh-token={}; Max-Age={}",
+                           "planck-blog-refresh-token={}; Max-Age={}",
                            urlEncode(*tokens.refresh_token), expire_sec));
     }
 }
@@ -136,7 +137,7 @@ E<nlohmann::json> postExcerptToJson(const Post& p)
     }
 
     nlohmann::json result;
-    result["id"] = *p.id;
+    result["id"] = std::to_string(*p.id);
     result["title"] = p.title;
     result["abstract"] = p.abstract;
     result["language"] = p.language;
@@ -174,7 +175,7 @@ E<App::SessionValidation> App::validateSession(const httplib::Request& req) cons
     }
 
     auto cookies = parseCookies(req.get_header_value("Cookie"));
-    if(auto it = cookies.find("access-token");
+    if(auto it = cookies.find("planck-blog-access-token");
        it != std::end(cookies))
     {
         spdlog::debug("Cookie has access token.");
@@ -187,7 +188,7 @@ E<App::SessionValidation> App::validateSession(const httplib::Request& req) cons
         }
     }
     // No access token or access token expired
-    if(auto it = cookies.find("refresh-token");
+    if(auto it = cookies.find("planck-blog-refresh-token");
        it != std::end(cookies))
     {
         spdlog::debug("Cookie has refresh token.");
@@ -250,6 +251,7 @@ App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
           hasher(std::make_unique<Sha256HalfHasher>()),
           attachment_manager(*hasher),
           post_cache(conf),
+          theme_manager(),
           base_url(),
           should_stop(false)
 {
@@ -274,6 +276,16 @@ App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
         }
     });
 
+    if(E<void> result = theme_manager.loadDir(
+           fs::path(config.data_dir) / "themes");
+       !result)
+    {
+        spdlog::error("Failed to load themes: {}", errorMsg(result.error()));
+    }
+
+    static_template_data = {{"blog_title", config.blog_title},
+                            {"themes", theme_manager.themeNames()}};
+    setup();
 }
 
 std::string App::urlFor(const std::string& name, const std::string& arg) const
@@ -289,6 +301,10 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     if(name == "statics")
     {
         return URL(base_url).appendPath("statics").appendPath(arg).str();
+    }
+    if(name == "stylesheet")
+    {
+        return URL(base_url).appendPath("themes").appendPath(arg).str();
     }
     if(name == "login")
     {
@@ -339,6 +355,10 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     {
         return URL(base_url).appendPath("upload-attachment").str();
     }
+    if(name == "select-theme")
+    {
+        return URL(base_url).appendPath("select-theme").str();
+    }
     return "";
 }
 
@@ -353,9 +373,9 @@ void App::handleIndex(const httplib::Request& req, httplib::Response& res)
         ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj, postExcerptToJson(p), res);
         posts_json.push_back(std::move(pj));
     }
-    nlohmann::json data{{"posts", std::move(posts_json)},
-                        {"blog_title", config.blog_title},
-                        {"session_user", session->user.name}};
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"posts", std::move(posts_json)},
+                      {"session_user", session->user.name}});
     std::string result = templates.render_file(
         "index.html", std::move(data));
     res.set_content(result, "text/html");
@@ -417,9 +437,9 @@ void App::handlePost(const httplib::Request& req, httplib::Response& res)
     }
 
     ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj, renderPostToJson(*std::move(p)), res);
-    nlohmann::json data{{"post", std::move(pj)},
-                        {"blog_title", config.blog_title},
-                        {"session_user", session->user.name}};
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"post", std::move(pj)},
+                      {"session_user", session->user.name}});
     std::string result = templates.render_file(
         "post.html", std::move(data));
     res.set_content(std::move(result), "text/html");
@@ -437,8 +457,9 @@ void App::handleDrafts(const httplib::Request& req, httplib::Response& res)
         ASSIGN_OR_RESPOND_ERROR(auto dj, postExcerptToJson(d), res);
         drafts_json.push_back(std::move(dj));
     }
-    nlohmann::json data{{"drafts", std::move(drafts_json)},
-                        {"session_user", session->user.name}};
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"drafts", std::move(drafts_json)},
+                      {"session_user", session->user.name}});
 
     std::string result = templates.render_file(
         "drafts.html", std::move(data));
@@ -451,9 +472,9 @@ void App::handleCreatePostFrontEnd(const httplib::Request& req,
     auto session = prepareSession(req, res);
     if(!session.has_value()) return;
 
-    nlohmann::json data{{"blog_title", config.blog_title},
-                        {"languages", config.languages},
-                        {"session_user", session->user.name}};
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"languages", config.languages},
+                      {"session_user", session->user.name}});
     std::string result = templates.render_file(
         "create_post.html", std::move(data));
     res.set_content(result, "text/html");
@@ -491,10 +512,10 @@ void App::handleEditPostFrontEnd(const httplib::Request& req,
         return;
     }
 
-    nlohmann::json data{{"blog_title", config.blog_title},
-                        {"languages", config.languages},
-                        {"session_user", session->user.name},
-                        {"post", postToJson(*p)}};
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"languages", config.languages},
+                      {"session_user", session->user.name},
+                      {"post", postToJson(*p)}});
     std::string result = templates.render_file(
         "edit_post.html", std::move(data));
     res.set_content(result, "text/html");
@@ -565,8 +586,9 @@ void App::handleAttachments(const httplib::Request& req, httplib::Response& res)
             });
     }
 
-    nlohmann::json data{{"attachments", std::move(atts_json)},
-                        {"session_user", session->user.name}};
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"attachments", std::move(atts_json)},
+                      {"session_user", session->user.name}});
 
     std::string result = templates.render_file(
         "attachments.html", std::move(data));
@@ -653,12 +675,35 @@ void App::handleAttachmentUpload(const httplib::Request& req,
     res.set_redirect(urlFor("attachments"));
 }
 
+void App::handleSelectTheme(const httplib::Request& req, httplib::Response& res)
+    const
+{
+    nlohmann::json data = parseJSON(req.body);
+    if(data.is_discarded())
+    {
+        res.status = 400;
+        res.set_content("Select theme request should be JSON", "text/plain");
+        return;
+    }
+
+    const auto& theme_obj = data["theme"];
+    if(!theme_obj.is_string())
+    {
+        res.status = 400;
+        res.set_content("Invalid select theme request", "text/plain");
+        return;
+    }
+    std::string_view theme = theme_obj.get_ref<const std::string&>();
+    res.set_header("Set-Cookie", std::format(
+        "planck-blog-theme={}; Max-Age=315360000", theme));
+}
+
 nlohmann::json App::postToJson(const Post& p) const
 {
     nlohmann::json result;
     if(p.id.has_value())
     {
-        result["id"] = *p.id;
+        result["id"] = std::to_string(*p.id);
     }
     result["markup"] = Post::markupToStr(p.markup);
     result["title"] = p.title;
@@ -699,10 +744,6 @@ nlohmann::json App::postToJson(const Post& p) const
 E<nlohmann::json> App::renderPostToJson(Post&& p)
 {
     nlohmann::json result = postToJson(p);
-    if(p.id.has_value())
-    {
-        result["id"] = std::to_string(*p.id);
-    }
     // Do template substitution in the post content. This allows
     // writer to write {{ url_for(...) }} in the post. If this fails,
     // we’ll just use the post content as-is.
@@ -753,16 +794,31 @@ E<Post> App::formToPost(const httplib::Request& req, std::string_view author) co
     return draft;
 }
 
-void App::start()
+void App::setup()
 {
-    std::string statics_dir = (std::filesystem::path(config.data_dir) /
-                               "statics").string();
-    spdlog::info("Mounting static dir at {}...", statics_dir);
-    auto ret = server.set_mount_point("/statics", statics_dir);
-    if (!ret)
     {
-        spdlog::error("Failed to mount statics");
-        return;
+        std::string statics_dir = (std::filesystem::path(config.data_dir) /
+                                   "statics").string();
+        spdlog::info("Mounting static dir at {}...", statics_dir);
+        auto ret = server.set_mount_point(
+            URL(base_url).appendPath("statics").path(), statics_dir);
+        if (!ret)
+        {
+            spdlog::error("Failed to mount statics");
+            return;
+        }
+    }
+    {
+        std::string themes_dir = (std::filesystem::path(config.data_dir) /
+                                 "themes").string();
+        spdlog::info("Mounting themes dir at {}...", themes_dir);
+        auto ret = server.set_mount_point(
+            URL(base_url).appendPath("themes").path(), themes_dir);
+        if (!ret)
+        {
+            spdlog::error("Failed to mount themes");
+            return;
+        }
     }
 
     server.Get(getPath("index"), [&](const httplib::Request& req,
@@ -830,7 +886,30 @@ void App::start()
     {
         handleAttachmentUpload(req, res);
     });
+    server.Post(getPath("select-theme"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleSelectTheme(req, res);
+    });
+}
 
+nlohmann::json App::baseTemplateData(const httplib::Request& req) const
+{
+    nlohmann::json data = static_template_data;
+    data["stylesheets"] = nlohmann::json::array();
+    std::string theme = config.default_theme;
+    auto cookies = parseCookies(req.get_header_value("Cookie"));
+    if(auto it = cookies.find("planck-blog-theme");
+       it != std::end(cookies))
+    {
+        theme = it->second;
+    }
+    data["stylesheets"] = theme_manager.stylesheets(theme);
+    return data;
+}
+
+void App::start()
+{
     spdlog::info("Listening at http://{}:{}/...", config.listen_address,
                  config.listen_port);
     server_thread = std::thread([&] {

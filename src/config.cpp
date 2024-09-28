@@ -94,5 +94,9 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     {
         tree["blog-title"] >> config.blog_title;
     }
+    if(tree["default-theme"].has_key())
+    {
+        tree["default-theme"] >> config.default_theme;
+    }
     return E<Configuration>{std::in_place, std::move(config)};
 }
