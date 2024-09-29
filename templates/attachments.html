@@ -8,7 +8,7 @@
     <div id="Body">
       {% include "nav.html" %}
 
-      <form method="post" enctype="multipart/form-data" action="{{ url_for("upload-attachment") }}">
+      <form method="post" enctype="multipart/form-data" action="{{ url_for("upload-attachment") }}" id="FormUpload">
         <div>
           <label for="file">Upload an attachment</label>
           <input type="file" id="FilePicker" name="file" />

@@ -187,3 +187,23 @@ h1.PostTitle > a
 {
     height: 64rem;
 }
+
+#FormUpload
+{
+    max-width: 700px;
+    margin: 2em auto;
+}
+
+#AttachmentTable
+{
+    margin: 1.5em auto;
+    width: 100%;
+    max-width: 1200px;
+}
+
+#AttachmentTable td
+{
+    font-family: "Iosevka SS10 Web", monospace;
+    text-align: center;
+    padding: 4px;
+}
