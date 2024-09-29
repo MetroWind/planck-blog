@@ -320,7 +320,24 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     }
     if(name == "attachment")
     {
-        return URL(base_url).appendPath("attachment").appendPath(arg).str();
+        if(arg.contains('/'))
+        {
+            return URL(base_url).appendPath("attachment").appendPath(arg).str();
+        }
+        else
+        {
+            auto att_maybe = data->getAttachment(arg);
+            if(att_maybe.has_value())
+            {
+                if(att_maybe->has_value())
+                {
+                    return URL(base_url).appendPath("attachment")
+                        .appendPath(arg).appendPath((*att_maybe)->original_name)
+                        .str();
+                }
+            }
+        }
+        return "";
     }
     if(name == "attachments")
     {

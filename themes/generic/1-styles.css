@@ -65,3 +65,8 @@ code, pre
     position: absolute;
     display: none;
 }
+
+#Post img
+{
+    max-width: 100%;
+}
