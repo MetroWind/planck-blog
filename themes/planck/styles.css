@@ -65,6 +65,34 @@ p:first-of-type, pre p, h2 + p, h3 + p, h4 + p, h5 + p, h6 + p
     text-indent: unset;
 }
 
+nav
+{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#Menu
+{
+    background-color: var(--color-alt-bg);
+}
+
+#Menu > ul
+{
+    list-style: none;
+    margin-left: 0px;
+}
+
+#Menu li
+{
+    padding: 6px;
+}
+
+#Menu li > a
+{
+    text-decoration: none;
+}
+
 main, #BlogTitle
 {
     max-width: 700px;
@@ -75,6 +103,11 @@ main, #BlogTitle
 {
     font-size: 2rem;
     font-style: italic;
+}
+
+#BlogTitle a
+{
+    text-decoration: none;
 }
 
 #PostList
@@ -120,4 +153,37 @@ h1.PostTitle > a
 #Post[lang^="zh-"] ul, #Post[lang^="zh-"] ol, #Post[lang="zh"] ul, #Post[lang="zh"] ol
 {
     margin-left: 2em;
+}
+
+#PostBody
+{
+    margin: 1em 0 4em 0;
+}
+
+#FormPost
+{
+    margin: 2rem 0;
+}
+
+#FormPost > table
+{
+    width: 100%;
+    table-layout: auto;
+}
+
+#FormPost input[type="text"], #FormPost textarea
+{
+    width: 100%;
+    font-family: "Iosevka Etoile Web", "Source Han Sans", "Noto Sans CJK", sans-serif;
+    font-size: 1rem;
+}
+
+#FormPost textarea
+{
+    line-height: 1.5;
+}
+
+#TextContent
+{
+    height: 64rem;
 }

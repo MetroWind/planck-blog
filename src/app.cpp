@@ -378,6 +378,7 @@ void App::handleIndex(const httplib::Request& req, httplib::Response& res)
                       {"session_user", session->user.name}});
     std::string result = templates.render_file(
         "index.html", std::move(data));
+    res.status = 200;
     res.set_content(result, "text/html");
 }
 
@@ -442,6 +443,7 @@ void App::handlePost(const httplib::Request& req, httplib::Response& res)
                       {"session_user", session->user.name}});
     std::string result = templates.render_file(
         "post.html", std::move(data));
+    res.status = 200;
     res.set_content(std::move(result), "text/html");
 }
 
@@ -463,6 +465,7 @@ void App::handleDrafts(const httplib::Request& req, httplib::Response& res)
 
     std::string result = templates.render_file(
         "drafts.html", std::move(data));
+    res.status = 200;
     res.set_content(result, "text/html");
 }
 
@@ -477,18 +480,65 @@ void App::handleCreatePostFrontEnd(const httplib::Request& req,
                       {"session_user", session->user.name}});
     std::string result = templates.render_file(
         "create_post.html", std::move(data));
+    res.status = 200;
     res.set_content(result, "text/html");
 }
 
-void App::handleCreateDraft(const httplib::Request& req,
+void App::handleSaveDraft(const httplib::Request& req,
                             httplib::Response& res) const
 {
     auto session = prepareSession(req, res);
     if(!session.has_value()) return;
 
     ASSIGN_OR_RESPOND_ERROR(Post draft, formToPost(req, session->user.name), res);
-    ASSIGN_OR_RESPOND_ERROR(int64_t id, data->saveDraft(std::move(draft)), res);
+    int64_t id;
+    if(draft.id.has_value())
+    {
+        id = *draft.id;
+        auto ok_maybe = data->editDraft(draft);
+        if(!ok_maybe)
+        {
+            res.status = 500;
+            res.set_content(errorMsg(ok_maybe.error()), "text/plain");
+            return;
+        }
+    }
+    else
+    {
+        ASSIGN_OR_RESPOND_ERROR(id, data->saveDraft(std::move(draft)),
+                                res);
+    }
     res.set_redirect(urlFor("edit-draft", std::to_string(id)));
+}
+void App::handleEditDraftFrontEnd(const httplib::Request& req,
+                                  httplib::Response& res)
+{
+    ASSIGN_OR_RESPOND_ERROR(
+        int64_t id, strToNumber<int64_t>(req.path_params.at("id")).or_else(
+            []([[maybe_unused]] auto _) -> E<int64_t>
+            {
+                return std::unexpected(httpError(401, "Invalid post ID"));
+            }), res);
+
+    auto session = prepareSession(req, res);
+    if(!session.has_value()) return;
+
+    ASSIGN_OR_RESPOND_ERROR(std::optional<Post> p, data->getDraft(id), res);
+    if(!p.has_value())
+    {
+        res.status = 404;
+        res.set_content("Draft not found", "text/plain");
+        return;
+    }
+
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"languages", config.languages},
+                      {"session_user", session->user.name},
+                      {"post", postToJson(*p)}});
+    std::string result = templates.render_file(
+        "edit_draft.html", std::move(data));
+    res.status = 200;
+    res.set_content(result, "text/html");
 }
 
 void App::handleEditPostFrontEnd(const httplib::Request& req,
@@ -518,6 +568,7 @@ void App::handleEditPostFrontEnd(const httplib::Request& req,
                       {"post", postToJson(*p)}});
     std::string result = templates.render_file(
         "edit_post.html", std::move(data));
+    res.status = 200;
     res.set_content(result, "text/html");
 }
 
@@ -592,6 +643,7 @@ void App::handleAttachments(const httplib::Request& req, httplib::Response& res)
 
     std::string result = templates.render_file(
         "attachments.html", std::move(data));
+    res.status = 200;
     res.set_content(result, "text/html");
 }
 
@@ -619,6 +671,7 @@ void App::handleAttachment(const httplib::Request& req, httplib::Response& res)
     std::ifstream file(path);
     std::string data(std::istreambuf_iterator<char>{file}, {});
     file.close();
+    res.status = 200;
     res.set_content(data, att->content_type);
 }
 
@@ -639,7 +692,6 @@ void App::handleAttachmentUpload(const httplib::Request& req,
         file.content, file.filename, file.content_type);
     fs::path path = fs::path(config.attachment_dir) /
         attachment_manager.path(att);
-    spdlog::debug("Adding attachment to {}...", path.string());
     fs::path dir = path.parent_path();
     if(!fs::exists(dir))
     {
@@ -696,6 +748,7 @@ void App::handleSelectTheme(const httplib::Request& req, httplib::Response& res)
     std::string_view theme = theme_obj.get_ref<const std::string&>();
     res.set_header("Set-Cookie", std::format(
         "planck-blog-theme={}; Max-Age=315360000", theme));
+    res.status = 204;
 }
 
 nlohmann::json App::postToJson(const Post& p) const
@@ -787,8 +840,8 @@ E<Post> App::formToPost(const httplib::Request& req, std::string_view author) co
             draft.id, strToNumber<int64_t>(req.get_param_value("id")));
     }
     draft.title = req.get_param_value("title");
-    draft.abstract = req.get_param_value("abstract");
-    draft.raw_content = req.get_param_value("content");
+    draft.abstract = strip(req.get_param_value("abstract"));
+    draft.raw_content = strip(req.get_param_value("content"));
     draft.language = req.get_param_value("language");
     draft.author = author;
     return draft;
@@ -851,6 +904,11 @@ void App::setup()
     {
         handleCreatePostFrontEnd(req, res);
     });
+    server.Get(getPath("edit-draft", "id"),
+               [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleEditDraftFrontEnd(req, res);
+    });
     server.Get(getPath("edit-post", "id"),
                [&](const httplib::Request& req, httplib::Response& res)
     {
@@ -864,7 +922,7 @@ void App::setup()
     server.Post(getPath("save-draft"),
                 [&](const httplib::Request& req, httplib::Response& res)
     {
-        handleCreateDraft(req, res);
+        handleSaveDraft(req, res);
     });
     server.Post(getPath("publish-from-new-draft"),
                 [&](const httplib::Request& req, httplib::Response& res)
@@ -905,6 +963,7 @@ nlohmann::json App::baseTemplateData(const httplib::Request& req) const
         theme = it->second;
     }
     data["stylesheets"] = theme_manager.stylesheets(theme);
+    data["current_theme"] = theme;
     return data;
 }
 

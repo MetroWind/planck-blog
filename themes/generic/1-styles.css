@@ -54,3 +54,14 @@ code, pre
     white-space: pre-wrap;
     word-break: break-all;
 }
+
+#NavLeft svg
+{
+    display: inline-block;
+}
+
+#Menu
+{
+    position: absolute;
+    display: none;
+}

@@ -128,3 +128,46 @@ inline std::string& toLower(std::string& s)
     [](unsigned char c){ return std::tolower(c); });
     return s;
 }
+
+inline std::string_view lstrip(std::string_view s)
+{
+    size_t i = 0;
+    while(i < s.size())
+    {
+        if(std::isspace(s[i]))
+        {
+            i++;
+        }
+        else
+        {
+            break;
+        }
+    }
+    return s.substr(i);
+}
+
+inline std::string_view rstrip(std::string_view s)
+{
+    if(s.empty())
+    {
+        return s;
+    }
+    size_t i = s.size();
+    while(i > 0)
+    {
+        if(std::isspace(s[i-1]))
+        {
+            i--;
+        }
+        else
+        {
+            break;
+        }
+    }
+    return s.substr(0, i);
+}
+
+inline std::string_view strip(std::string_view s)
+{
+    return rstrip(lstrip(s));
+}

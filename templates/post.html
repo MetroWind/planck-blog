@@ -13,7 +13,7 @@
     <div id="Body">
       {% include "nav.html" %}
       <header id="BlogTitle">
-        <h1>{{ blog_title }}</h1>
+        <h1><a href="{{ url_for("index") }}">{{ blog_title }}</a></h1>
       </header>
       <main>
         <article id="Post" lang="{{ post.language }}">

@@ -1,8 +1,33 @@
 <nav>
-  <span><label for="SelectTheme">Theme</label>
+  <span id="NavLeft">
+    {% if length(session_user) > 0 %}
+    <a href="#" id="BtnMenu">
+      <svg viewBox="0 0 32 32" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+        <line x1="0" x2="32" y1="4" y2="4" stroke="currentcolor" stroke-width="3"/>
+        <line x1="0" x2="32" y1="16" y2="16" stroke="currentcolor" stroke-width="3"/>
+        <line x1="0" x2="32" y1="28" y2="28" stroke="currentcolor" stroke-width="3"/>
+      </svg>
+    </a>
+    <div id="Menu">
+      <ul>
+        <li><a href="{{ url_for("create-post") }}">New</a></li>
+        <li><a href="{{ url_for("drafts") }}">Drafts</a></li>
+        <li><a href="{{ url_for("attachments") }}">Attachments</a></li>
+      </ul>
+    </div>
+    {% endif %}
+  </span>
+
+  <span id="NavCenter"></span>
+
+  <span id="NavRight"><label for="SelectTheme">Theme</label>
     <select name="theme" id="SelectTheme">
       {% for theme in themes %}
+      {% if theme == current_theme %}
+      <option value="{{ theme }}" selected>{{ theme }}</option>
+      {% else %}
       <option value="{{ theme }}">{{ theme }}</option>
+      {% endif %}
       {% endfor %}
     </select>
   <span>

@@ -42,8 +42,10 @@ public:
     void handleDrafts(const httplib::Request& req, httplib::Response& res);
     void handleCreatePostFrontEnd(const httplib::Request& req,
                                   httplib::Response& res);
-    void handleCreateDraft(const httplib::Request& req, httplib::Response& res)
+    void handleSaveDraft(const httplib::Request& req, httplib::Response& res)
         const;
+    void handleEditDraftFrontEnd(const httplib::Request& req,
+                                 httplib::Response& res);
     void handleEditPostFrontEnd(const httplib::Request& req,
                                 httplib::Response& res);
     void handleSavePost(const httplib::Request& req, httplib::Response& res)

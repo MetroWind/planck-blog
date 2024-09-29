@@ -72,6 +72,7 @@ TEST(App, CopyReqToHttplibReq)
 TEST(App, LoginBringsUserToLoginURL)
 {
     Configuration config;
+    config.base_url = "http://localhost/";
     auto auth = std::make_unique<AuthMock>();
     EXPECT_CALL(*auth, initialURL()).WillOnce(Return("http://aaa/"));
     ASSIGN_OR_FAIL(auto data, DataSourceSqlite::newFromMemory());
@@ -86,6 +87,7 @@ TEST(App, LoginBringsUserToLoginURL)
 TEST(App, CanHandleOpenIDRedirect)
 {
     Configuration config;
+    config.base_url = "http://localhost/";
     auto auth = std::make_unique<AuthMock>();
     Tokens expected_tokens;
     expected_tokens.access_token = "bbb";
@@ -108,6 +110,7 @@ TEST(App, CanHandleOpenIDRedirect)
 TEST(App, OpenIDRedirectCanHandleUpstreamError)
 {
     Configuration config;
+    config.base_url = "http://localhost/";
     auto auth = std::make_unique<AuthMock>();
     ASSIGN_OR_FAIL(auto data, DataSourceSqlite::newFromMemory());
     App app(config, std::move(auth), std::move(data));
@@ -126,49 +129,53 @@ TEST(App, OpenIDRedirectCanHandleUpstreamError)
     }
 }
 
-TEST_F(UserAppTest, CanStart)
-{
-    app->start();
-    app->stop();
-    app->wait();
-}
-
 TEST_F(UserAppTest, CanHandleIndex)
 {
     EXPECT_CALL(*data_source, getPostExcerpts())
         .WillOnce(Return(std::vector<Post>()));
 
-    httplib::Request req;
-    req.set_header("Cookie", "access-token=aaa");
-    httplib::Response res;
-    app->handleIndex(req, res);
-    // httplib::Response::status is default to -1. Httplib will set it
-    // when sending the response.
-    EXPECT_EQ(res.status, -1);
-    EXPECT_TRUE(res.body.contains("<title>Test Blog</title>"));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res,
+                       client.get("http://localhost:8080/blog"));
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+        EXPECT_THAT(res->payloadAsStr(), HasSubstr("<title>Test Blog</title>"));
+    }
+    app->stop();
+    app->wait();
 }
 
 TEST_F(UserAppTest, CanHandleDrafts)
 {
     EXPECT_CALL(*data_source, getDrafts())
         .WillOnce(Return(std::vector<Post>()));
-
-    httplib::Request req;
-    req.set_header("Cookie", "access-token=aaa");
-    httplib::Response res;
-    app->handleDrafts(req, res);
-    EXPECT_EQ(res.status, -1);
-    EXPECT_TRUE(res.body.contains("<title>Drafts</title>"));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res, client.get(
+            HTTPRequest("http://localhost:8080/blog/drafts")
+            .addHeader("Cookie", "planck-blog-access-token=aaa")));
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+        EXPECT_THAT(res->payloadAsStr(), HasSubstr("<title>Drafts</title>"));
+    }
+    app->stop();
+    app->wait();
 }
 
 TEST_F(UserAppTest, CanHandleCreatePostFrontEnd)
 {
-    httplib::Request req;
-    req.set_header("Cookie", "access-token=aaa");
-    httplib::Response res;
-    app->handleCreatePostFrontEnd(req, res);
-    EXPECT_EQ(res.status, -1);
-    EXPECT_TRUE(res.body.contains("<title>New Post</title>"));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res, client.get(
+            HTTPRequest("http://localhost:8080/blog/create-post")
+            .addHeader("Cookie", "planck-blog-access-token=aaa")));
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+        EXPECT_THAT(res->payloadAsStr(), HasSubstr("<title>New Post</title>"));
+    }
+    app->stop();
+    app->wait();
 }
 
 TEST_F(UserAppTest, CanHandleCreateDraft)
@@ -189,7 +196,7 @@ TEST_F(UserAppTest, CanHandleCreateDraft)
             HTTPRequest("http://localhost:8080/blog/save-draft").setPayload(
                 "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
                 "content=ddd")
-            .addHeader("Cookie", "access-token=aaa")
+            .addHeader("Cookie", "planck-blog-access-token=aaa")
             .setContentType("application/x-www-form-urlencoded")));
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
@@ -220,7 +227,7 @@ TEST_F(UserAppTest, CanHandlePublishFromNewDraft)
             .setPayload(
                 "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
                 "content=ddd")
-            .addHeader("Cookie", "access-token=aaa")
+            .addHeader("Cookie", "planck-blog-access-token=aaa")
             .setContentType("application/x-www-form-urlencoded")));
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
@@ -250,7 +257,7 @@ TEST_F(UserAppTest, CanHandlePost)
         HTTPSession client;
         ASSIGN_OR_FAIL(const HTTPResponse* res,
                        client.get(HTTPRequest("http://localhost:8080/blog/p/1")
-                                  .addHeader("Cookie", "access-token=aaa")));
+                                  .addHeader("Cookie", "planck-blog-access-token=aaa")));
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_THAT(res->payloadAsStr(), HasSubstr("<h1>aaa</h1>"));
         EXPECT_THAT(res->payloadAsStr(),
@@ -277,7 +284,7 @@ TEST_F(UserAppTest, CanHandleEditPostFrontEnd)
         HTTPSession client;
         ASSIGN_OR_FAIL(const HTTPResponse* res, client.get(
             HTTPRequest("http://localhost:8080/blog/edit-post/1")
-            .addHeader("Cookie", "access-token=aaa")));
+            .addHeader("Cookie", "planck-blog-access-token=aaa")));
 
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
     }
@@ -305,7 +312,7 @@ TEST_F(UserAppTest, CanHandleSavePost)
             HTTPRequest("http://localhost:8080/blog/save-post").setPayload(
                 "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
                 "content=ddd&id=1")
-            .addHeader("Cookie", "access-token=aaa")
+            .addHeader("Cookie", "planck-blog-access-token=aaa")
             .setContentType("application/x-www-form-urlencoded")));
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
@@ -331,7 +338,7 @@ TEST_F(UserAppTest, CanHandleAttachments)
         HTTPSession client;
         ASSIGN_OR_FAIL(const HTTPResponse* res, client.get(
             HTTPRequest("http://localhost:8080/blog/attachments")
-            .addHeader("Cookie", "access-token=aaa")));
+            .addHeader("Cookie", "planck-blog-access-token=aaa")));
 
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_THAT(res->payloadAsStr(), HasSubstr(

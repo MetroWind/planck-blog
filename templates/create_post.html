@@ -11,40 +11,42 @@
         <h1>{{ blog_title }}</h1>
       </header>
 
-      <form>
-        <table>
-          <colgroup>
-            <col id="ColumnLabel" />
-            <col id="ColumnValue" />
-          </colgroup>
-          <tr>
-            <td><label for="title">Title</label></td>
-            <td><input type="text" name="title" id="TextTitle" required /></td>
-          </tr>
-          <tr>
-            <td><label for="language">Language</label></td>
-            <td><select name="language" id="DropDownLanguage">
-                {% for lang in languages %}
-                <option value="{{ lang }}">{{ lang }}</option>
-                {% endfor %}
-            </select></td>
-          </tr>
-          <tr>
-            <td><label for="markup">Markup</label></td>
-            <td><select name="markup" id="DropDownMarkup">
-                <option value="CommonMark">CommonMark</option>
-                <option value="AsciiDoc">AsciiDoc</option>
-            </select></td>
-          </tr>
-        </table>
-        <div><label for="abstract">Abstract:</label></div>
-        <div><textarea id="TextAbstract" name="abstract" required></textarea></div>
-        <div><textarea id="TextContent" name="content" required></textarea></div>
-        <div id="ButtonBar">
-          <input type="submit" value="Save draft" formaction="{{ url_for("save-draft") }}" formmethod="post" formtarget="_self" />
-          <input type="submit" value="Publish" formaction="{{ url_for("publish-from-new-draft") }}" formmethod="post" formtarget="_self" />
-        </div>
-      </form>
+      <main>
+        <form id="FormPost">
+          <table>
+            <colgroup>
+              <col id="ColumnLabel" />
+              <col id="ColumnValue" />
+            </colgroup>
+            <tr>
+              <td><label for="title">Title</label></td>
+              <td><input type="text" name="title" id="TextTitle" required /></td>
+            </tr>
+            <tr>
+              <td><label for="language">Language</label></td>
+              <td><select name="language" id="DropDownLanguage">
+                  {% for lang in languages %}
+                  <option value="{{ lang }}">{{ lang }}</option>
+                  {% endfor %}
+              </select></td>
+            </tr>
+            <tr>
+              <td><label for="markup">Markup</label></td>
+              <td><select name="markup" id="DropDownMarkup">
+                  <option value="CommonMark">CommonMark</option>
+                  <option value="AsciiDoc">AsciiDoc</option>
+              </select></td>
+            </tr>
+          </table>
+          <div><label for="abstract">Abstract:</label></div>
+          <div><textarea id="TextAbstract" name="abstract" required></textarea></div>
+          <div><textarea id="TextContent" name="content" required></textarea></div>
+          <div id="ButtonBar">
+            <input type="submit" value="Save draft" formaction="{{ url_for("save-draft") }}" formmethod="post" formtarget="_self" />
+            <input type="submit" value="Publish" formaction="{{ url_for("publish-from-new-draft") }}" formmethod="post" formtarget="_self" />
+          </div>
+        </form>
+      </main>
     </div>
   </body>
 </html>

@@ -40,7 +40,10 @@ URL& URL::operator=(const URL& rhs)
         curl_url_cleanup(url);
         url = nullptr;
     }
-    url = curl_url_dup(rhs.url);
+    if(rhs.url != nullptr)
+    {
+        url = curl_url_dup(rhs.url);
+    }
     return *this;
 }
 
