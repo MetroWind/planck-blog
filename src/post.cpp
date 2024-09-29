@@ -17,9 +17,9 @@ std::string Post::markupToStr(Markup m)
     switch(m)
     {
     case COMMONMARK:
-        return "commonmark";
+        return "CommonMark";
     case ASCIIDOC:
-        return "asciidoc";
+        return "AsciiDoc";
     }
     std::unreachable();
 }

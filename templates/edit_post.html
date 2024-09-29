@@ -28,17 +28,21 @@
             </tr>
             <tr>
               <td><label for="language">Language</label></td>
-              <td><select name="language" id="DropDownLanguage" value="{{ post.language }}">
+              <td><select name="language" id="DropDownLanguage">
                   {% for lang in languages %}
+                  {% if lang == post.language %}
+                  <option value="{{ lang }}" selected>{{ lang }}</option>
+                  {% else %}
                   <option value="{{ lang }}">{{ lang }}</option>
+                  {% endif %}
                   {% endfor %}
               </select></td>
             </tr>
             <tr>
               <td><label for="markup">Markup</label></td>
-              <td><select name="markup" id="DropDownMarkup" value="{{ post.markup }}">
-                  <option value="CommonMark">CommonMark</option>
-                  <option value="AsciiDoc">AsciiDoc</option>
+              <td><select name="markup" id="DropDownMarkup">
+                  <option value="CommonMark" {% if post.markup == "CommonMark" %}selected{% endif %}>CommonMark</option>
+                  <option value="AsciiDoc"{% if post.markup == "AsciiDoc" %}selected{% endif %}>AsciiDoc</option>
               </select></td>
             </tr>
           </table>
