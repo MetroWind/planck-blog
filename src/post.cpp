@@ -1,5 +1,10 @@
-#include "post.hpp"
+#include <iostream>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
+#include "post.hpp"
 
 bool Post::isValidMarkupInt(int i)
 {
