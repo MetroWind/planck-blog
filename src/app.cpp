@@ -347,7 +347,7 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     {
         return URL(base_url).appendPath("save-post").str();
     }
-    if(name == "publish-from-new-draft")
+    if(name == "publish-from-draft")
     {
         return URL(base_url).appendPath("publish-from-new-draft").str();
     }
@@ -597,14 +597,31 @@ void App::handleSavePost(const httplib::Request& req, httplib::Response& res)
     res.set_redirect(urlFor("post", std::to_string(*p.id)));
 }
 
-void App::handlePublishFromNewDraft(const httplib::Request& req, httplib::Response& res)
+void App::handlePublishFromDraft(const httplib::Request& req, httplib::Response& res)
     const
 {
     auto session = prepareSession(req, res);
     if(!session.has_value()) return;
 
-    ASSIGN_OR_RESPOND_ERROR(Post draft, formToPost(req, session->user.name), res);
-    ASSIGN_OR_RESPOND_ERROR(int64_t id, data->saveDraft(std::move(draft)), res);
+    ASSIGN_OR_RESPOND_ERROR(Post draft, formToPost(req, session->user.name),
+                            res);
+    int64_t id;
+    if(draft.id.has_value())
+    {
+        id = *draft.id;
+        auto ok_maybe = data->editDraft(draft);
+        if(!ok_maybe)
+        {
+            res.status = 500;
+            res.set_content(errorMsg(ok_maybe.error()), "text/plain");
+            return;
+        }
+    }
+    else
+    {
+        ASSIGN_OR_RESPOND_ERROR(id, data->saveDraft(std::move(draft)),
+                                res);
+    }
     if(!data->publishPost(id))
     {
         res.status = 500;
@@ -924,10 +941,10 @@ void App::setup()
     {
         handleSaveDraft(req, res);
     });
-    server.Post(getPath("publish-from-new-draft"),
+    server.Post(getPath("publish-from-draft"),
                 [&](const httplib::Request& req, httplib::Response& res)
     {
-        handlePublishFromNewDraft(req, res);
+        handlePublishFromDraft(req, res);
     });
     server.Get(getPath("attachments"),
                 [&](const httplib::Request& req, httplib::Response& res)
