@@ -12,7 +12,8 @@ provides=("${pkgname%-git}")
 conflicts=("${pkgname%-git}")
 replaces=()
 backup=("etc/planck-blog.yaml")
-options=(!debug)
+# Stripping doesn’t work with ryml.
+options=(!debug !strip)
 install=planck-blog.install
 source=('git+https://github.com/MetroWind/planck-blog.git' "sysusers-${pkgname%-git}.conf" "${pkgname%-git}.service" "${pkgname%-git}.yaml")
 noextract=()
