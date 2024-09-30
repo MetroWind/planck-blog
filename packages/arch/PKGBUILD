@@ -33,6 +33,8 @@ build()
           -DCMAKE_BUILD_TYPE='None' \
           -DCMAKE_INSTALL_PREFIX='/usr' \
           -Wno-dev .
+    # https://github.com/abdes/cryptopp-cmake/issues/125
+    patch --forward -u -p0 < cryptopp-cmake.patch
     cmake --build build
 }
 
