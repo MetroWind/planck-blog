@@ -122,13 +122,13 @@ set(INCLUDES
   ${libmagic_INCLUDE_DIRS}
 )
 
-add_executable(nsblog ${SOURCE_FILES} src/main.cpp)
-set_property(TARGET nsblog PROPERTY CXX_STANDARD 23)
+add_executable(planck-blog ${SOURCE_FILES} src/main.cpp)
+set_property(TARGET planck-blog PROPERTY CXX_STANDARD 23)
 
-set_property(TARGET nsblog PROPERTY COMPILE_WARNING_AS_ERROR TRUE)
-target_compile_options(nsblog PRIVATE -Wall -Wextra -Wpedantic)
-target_include_directories(nsblog PRIVATE ${INCLUDES})
-target_link_libraries(nsblog PRIVATE ${LIBS})
+set_property(TARGET planck-blog PROPERTY COMPILE_WARNING_AS_ERROR TRUE)
+target_compile_options(planck-blog PRIVATE -Wall -Wextra -Wpedantic)
+target_include_directories(planck-blog PRIVATE ${INCLUDES})
+target_link_libraries(planck-blog PRIVATE ${LIBS})
 
 set(TEST_FILES
   src/app_test.cpp
@@ -150,18 +150,18 @@ set(TEST_FILES
 )
 
 # ctest --test-dir build
-add_executable(nsblog_test ${SOURCE_FILES} ${TEST_FILES})
-set_property(TARGET nsblog_test PROPERTY CXX_STANDARD 23)
+add_executable(planck-blog_test ${SOURCE_FILES} ${TEST_FILES})
+set_property(TARGET planck-blog_test PROPERTY CXX_STANDARD 23)
 
-set_property(TARGET nsblog_test PROPERTY COMPILE_WARNING_AS_ERROR TRUE)
-target_compile_options(nsblog_test PRIVATE -Wall -Wextra -Wpedantic)
-target_include_directories(nsblog_test PRIVATE
+set_property(TARGET planck-blog_test PROPERTY COMPILE_WARNING_AS_ERROR TRUE)
+target_compile_options(planck-blog_test PRIVATE -Wall -Wextra -Wpedantic)
+target_include_directories(planck-blog_test PRIVATE
   ${INCLUDES}
   ${googletest_SOURCE_DIR}/googletest/include
   ${googletest_SOURCE_DIR}/googlemock/include
 )
 
-target_link_libraries(nsblog_test PRIVATE
+target_link_libraries(planck-blog_test PRIVATE
   ${LIBS}
   GTest::gtest_main
   GTest::gmock_main
@@ -169,6 +169,6 @@ target_link_libraries(nsblog_test PRIVATE
 
 enable_testing()
 include(GoogleTest)
-gtest_discover_tests(nsblog_test
+gtest_discover_tests(planck-blog_test
   # Need this so that the unit tests can find the templates.
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
