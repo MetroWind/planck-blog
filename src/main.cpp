@@ -18,11 +18,12 @@
 
 int main(int argc, char** argv)
 {
-    spdlog::set_level(spdlog::level::debug);
-    cxxopts::Options cmd_options("NS Weekly", "Naively simple weekly snippet");
+    // spdlog::set_level(spdlog::level::debug);
+    cxxopts::Options cmd_options(
+        "Planck Blog", "A naively simple blog server that is barely enough");
     cmd_options.add_options()
         ("c,config", "Config file",
-         cxxopts::value<std::string>()->default_value("/etc/nsweekly.yaml"))
+         cxxopts::value<std::string>()->default_value("/etc/planck-blog.yaml"))
         ("legacy-migration", "Migrate the legacy posts from a directory",
          cxxopts::value<std::string>())
         ("h,help", "Print this message.");
