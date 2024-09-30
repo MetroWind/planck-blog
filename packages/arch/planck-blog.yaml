@@ -1,0 +1,12 @@
+data-dir: "/var/lib/planck-blog"
+attachment-dir: "/var/lib/planck-blog/attachments"
+listen-address: localhost
+listen-port: 8080
+# client-id:
+# client-secret:
+# openid-url-prefix:
+base-url: http://localhost:8080
+languages:
+  - en-US
+blog-title: My Blog
+default-theme: planck-light

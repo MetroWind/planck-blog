@@ -1,0 +1,47 @@
+pkgname=planck-blog-git
+pkgver=0.1
+pkgrel=1
+pkgdesc="A naively simple blog server that is barely enough"
+arch=('x86_64')
+url="https://github.com/MetroWind/plank-blog"
+license=('MIT')
+groups=()
+depends=('sqlite' 'curl' 'cmark' 'asciidoctor')
+makedepends=('git' 'cmake' 'gcc')
+provides=("${pkgname%-git}")
+conflicts=("${pkgname%-git}")
+replaces=()
+backup=("etc/planck-blog.yaml")
+options=(!debug)
+install=planck-blog.install
+source=('git+https://github.com/MetroWind/planck-blog.git' "sysusers-${pkgname%-git}.conf" "${pkgname%-git}.service" "${pkgname%-git}.yaml")
+noextract=()
+sha256sums=('SKIP' "cbd783eda38d6ba8b30ab73e2edbce2b2acea9734647e58aeb52f0121a384e93"
+            "f9cb98d275baa20d552dfaf17f5cfa250c06ad077d6e5bb6537306b6194566fd"
+            "7e6b4ebb9b942642ec7bf3a435197ae11d5dd0576a2fe4506041c097657d0101")
+
+pkgver()
+{
+	cd "$srcdir/${pkgname%-git}"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+build()
+{
+	cd "$srcdir/${pkgname%-git}"
+    cmake -B build \
+          -DCMAKE_BUILD_TYPE='None' \
+          -DCMAKE_INSTALL_PREFIX='/usr' \
+          -Wno-dev .
+    cmake --build build
+}
+
+package()
+{
+    install -Dm755 -t "$pkgdir/usr/bin" "${srcdir}/${pkgname%-git}/build/${pkgname%-git}"
+    mkdir -pv "$pkgdir/var/lib/${pkgname%-git}/attachments"
+    cp -r "${srcdir}/${pkgname%-git}/"{statics,templates,themes} "${pkgdir}/var/lib/${pkgname%-git}"
+    install -Dm644 -t "$pkgdir/etc" "${srcdir}/${pkgname%-git}.yaml"
+    install -Dm644 "${srcdir}/sysusers-${pkgname%-git}.conf" "${pkgdir}/usr/lib/sysusers.d/${pkgname%-git}.conf"
+    install -Dm644 "${srcdir}/${pkgname%-git}.service" "${pkgdir}/usr/lib/systemd/system/${pkgname%-git}.service"
+}

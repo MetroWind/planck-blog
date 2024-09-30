@@ -1,0 +1,9 @@
+post_install()
+{
+    chown -R planck:planck var/lib/planck-blog
+}
+
+post_upgrade()
+{
+    chown -R planck:planck var/lib/planck-blog
+}

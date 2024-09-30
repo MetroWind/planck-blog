@@ -1,0 +1,12 @@
+[Unit]
+Description=PlanckBlog service
+After=network.target
+
+[Service]
+User=planck
+Group=planck
+ExecStart=/usr/bin/planck-blog
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
