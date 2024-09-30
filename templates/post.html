@@ -28,6 +28,9 @@
               {{ post.update_time_str }}
             </time>
             {% endif %}
+            {% if length(session_user) > 0 %}
+            <a href="{{ url_for("edit-post", post.id) }}">[EDIT]</a>
+            {% endif %}
           </div>
           <div id="PostBody">{{ post.content }}</div>
         </article>
