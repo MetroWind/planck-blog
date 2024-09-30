@@ -26,6 +26,8 @@ int main(int argc, char** argv)
          cxxopts::value<std::string>()->default_value("/etc/planck-blog.yaml"))
         ("legacy-migration", "Migrate the legacy posts from a directory and exit",
          cxxopts::value<std::string>())
+        ("delete-post", "Delete a post or draft by ID and exit",
+         cxxopts::value<int64_t>())
         ("set", "Set a runtime setting and exit. Example:"
          " --set pause-update-time=true. The only setting available right now"
          " is pause-update-time.",
@@ -53,6 +55,29 @@ int main(int argc, char** argv)
     {
         auto ok_maybe = migrate(
             opts["legacy-migration"].as<std::string>(), *conf);
+        if(ok_maybe)
+        {
+            return 0;
+        }
+        else
+        {
+            spdlog::error(errorMsg(ok_maybe.error()));
+            return 1;
+        }
+    }
+
+    if(opts.count("delete-post") == 1)
+    {
+        int64_t id = opts["delete-post"].as<int64_t>();
+        auto data_source = DataSourceSqlite::fromFile(
+            (std::filesystem::path(conf->data_dir) / "data.db").string());
+        if(!data_source.has_value())
+        {
+            spdlog::error("Failed to create data source: {}",
+                          errorMsg(data_source.error()));
+            return 2;
+        }
+        E<void> ok_maybe = (*data_source)->deletePost(id);
         if(ok_maybe)
         {
             return 0;
