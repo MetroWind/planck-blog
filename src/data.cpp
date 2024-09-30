@@ -11,6 +11,7 @@
 
 #include <spdlog/spdlog.h>
 #include <sqlite3.h>
+#include <nlohmann/json.hpp>
 
 #include "attachment.hpp"
 #include "data.hpp"
@@ -53,6 +54,20 @@ E<Post> postFromRow(const std::tuple<int, int, std::string, std::string,
 
 } // namespace
 
+E<nlohmann::json> DataSourceInterface::getValueWithDefault(
+        const std::string& key, nlohmann::json&& default_value) const
+{
+    ASSIGN_OR_RETURN(std::optional<nlohmann::json> v, this->getValue(key));
+    if(v.has_value())
+    {
+        return *v;
+    }
+    else
+    {
+        return default_value;
+    }
+}
+
 E<std::unique_ptr<DataSourceSqlite>>
 DataSourceSqlite::fromFile(const std::string& db_file)
 {
@@ -73,6 +88,9 @@ DataSourceSqlite::fromFile(const std::string& db_file)
         "(hash TEXT, origin TEXT, request_count INTEGER,"
         " FOREIGN KEY (hash) REFERENCES Attachments(hash) ON DELETE CASCADE"
         " ON UPDATE CASCADE);"));
+    DO_OR_RETURN(data_source->db->execute(
+        "CREATE TABLE IF NOT EXISTS KeyValues "
+        "(key TEXT PRIMARY KEY, value TEXT);"));
     return data_source;
 }
 
@@ -142,6 +160,34 @@ E<void> DataSourceSqlite::updatePost(Post&& new_post) const
         static_cast<int>(new_post.markup), new_post.title, new_post.abstract,
         new_post.raw_content, timeToSeconds(Clock::now()), new_post.language,
         *new_post.id));
+    DO_OR_RETURN(db->execute(std::move(sql)));
+    int64_t rows_count = db->changedRowsCount();
+    if(rows_count == 0)
+    {
+        return std::unexpected(runtimeError("Post not found"));
+    }
+    if(rows_count != 1)
+    {
+        return std::unexpected(runtimeError(
+            "Something weird happened when updating the post. Behavior is "
+            "undefined"));
+    }
+    return {};
+}
+
+E<void> DataSourceSqlite::updatePostNoUpdateTime(const Post& new_post) const
+{
+    if(!new_post.id.has_value())
+    {
+        return std::unexpected(runtimeError(
+            "Trying to update a post without ID"));
+    }
+    ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
+        "UPDATE Posts SET markup = ?, title = ?, abstract = ?, content = ?, "
+        "language = ? WHERE id = ?;"));
+    DO_OR_RETURN(sql.bind(
+        static_cast<int>(new_post.markup), new_post.title, new_post.abstract,
+        new_post.raw_content, new_post.language, *new_post.id));
     DO_OR_RETURN(db->execute(std::move(sql)));
     int64_t rows_count = db->changedRowsCount();
     if(rows_count == 0)
@@ -400,4 +446,39 @@ E<std::vector<Post>> DataSourceSqlite::filterPosts(std::string_view sql_suffix)
         posts.push_back(std::move(p));
     }
     return posts;
+}
+
+E<std::optional<nlohmann::json>> DataSourceSqlite::getValue(
+    const std::string& key) const
+{
+    ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
+        "SELECT value FROM KeyValues WHERE key = ?;"));
+    DO_OR_RETURN(sql.bind(key));
+    ASSIGN_OR_RETURN(auto rows, (db->eval<std::string>(std::move(sql))));
+    if(rows.empty())
+    {
+        return std::nullopt;
+    }
+    nlohmann::json v = parseJSON(std::get<0>(rows[0]));
+    if(v.is_discarded())
+    {
+        return std::unexpected(runtimeError("Invalid JSON value"));
+    }
+    return v;
+}
+
+E<void> DataSourceSqlite::setValue(const std::string& key,
+                                   nlohmann::json&& value) const
+{
+    ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
+        "INSERT INTO KeyValues (key, value) VALUES (?, ?) ON CONFLICT DO "
+        "UPDATE SET value = ?;"));
+    std::string v = value.dump();
+    DO_OR_RETURN(sql.bind(key, v, v));
+    DO_OR_RETURN(db->execute(std::move(sql)));
+    if(db->changedRowsCount() != 1)
+    {
+        return std::unexpected(runtimeError("Failed to set value."));
+    }
+    return {};
 }

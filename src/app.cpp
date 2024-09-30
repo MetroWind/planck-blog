@@ -603,7 +603,24 @@ void App::handleSavePost(const httplib::Request& req, httplib::Response& res)
         return;
     }
 
-    auto maybe_error = data->updatePost(std::move(p));
+    E<nlohmann::json> value = data->getValueWithDefault(
+        "pause_update_time", false);
+    if(!value.has_value())
+    {
+        res.status = 500;
+        res.set_content(errorMsg(value.error()), "text/plain");
+        return;
+    }
+    E<void> maybe_error;
+    if(value->get<bool>())
+    {
+        maybe_error = data->updatePostNoUpdateTime(p);
+    }
+    else
+    {
+        maybe_error = data->updatePost(std::move(p));
+    }
+
     if(!maybe_error.has_value())
     {
         res.status = 500;

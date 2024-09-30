@@ -39,6 +39,8 @@ public:
     // time, and thus invalidate the post object, meaning the post
     // object is no longer correct.
     virtual E<void> updatePost(Post&& new_post) const = 0;
+    // Similar to updatePost() but do not change update_time.
+    virtual E<void> updatePostNoUpdateTime(const Post& new_post) const = 0;
     // Create a new draft. A draft is just a post with a zero publish
     // time.
     virtual E<int64_t> saveDraft(Post&& new_post) const = 0;
@@ -72,6 +74,15 @@ public:
     virtual E<void> addAttachmentReferral(const std::string& attachment_hash,
                                           const std::string& url) const = 0;
 
+    // The data source can act as a key-value store that stores JSON
+    // values. This function retrieves a value from the store.
+    virtual E<std::optional<nlohmann::json>> getValue(const std::string& key)
+        const = 0;
+    E<nlohmann::json> getValueWithDefault(
+        const std::string& key, nlohmann::json&& default_value) const;
+    virtual E<void> setValue(const std::string& key, nlohmann::json&& value)
+        const = 0;
+
 protected:
     virtual E<void> setSchemaVersion(int64_t v) const = 0;
 
@@ -99,6 +110,7 @@ public:
     E<std::vector<Post>> getPostExcerpts() const override;
     E<std::optional<Post>> getPost(int64_t id) const override;
     E<void> updatePost(Post&& new_post) const override;
+    E<void> updatePostNoUpdateTime(const Post& new_post) const override;
     E<int64_t> saveDraft(Post&& new_post) const override;
     E<std::vector<Post>> getDrafts() const override;
     E<std::optional<Post>> getDraft(int64_t id) const override;
@@ -114,11 +126,15 @@ public:
         const override;
     E<void> addAttachmentReferral(const std::string& attachment_hash,
                                   const std::string& url) const override;
+    E<std::optional<nlohmann::json>> getValue(const std::string& key)
+        const override;
+    E<void> setValue(const std::string& key, nlohmann::json&& value)
+        const override;
+    // Do not use.
+    DataSourceSqlite() = default;
 
     E<void> forceSetPostTimes(int64_t id, const Time& publish,
                               const std::optional<Time>& update) const;
-    // Do not use.
-    DataSourceSqlite() = default;
 
 protected:
     E<void> setSchemaVersion(int64_t v) const override;

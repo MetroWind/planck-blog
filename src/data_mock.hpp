@@ -21,6 +21,8 @@ public:
     MOCK_METHOD(E<std::vector<Post>>, getPostExcerpts, (), (const override));
     MOCK_METHOD(E<std::optional<Post>>, getPost, (int64_t id), (const override));
     MOCK_METHOD(E<void>, updatePost, (Post&& new_post), (const override));
+    MOCK_METHOD(E<void>, updatePostNoUpdateTime, (const Post& new_post),
+                (const override));
     MOCK_METHOD(E<int64_t>, saveDraft, (Post&& new_post), (const override));
     MOCK_METHOD(E<std::vector<Post>>, getDrafts, (), (const override));
     MOCK_METHOD(E<std::optional<Post>>, getDraft, (int64_t id), (const override));
@@ -38,6 +40,10 @@ public:
                 (const std::string& hash), (const override));
     MOCK_METHOD(E<void>, addAttachmentReferral,
                 (const std::string& attachment_hash, const std::string& url),
+                (const override));
+    MOCK_METHOD(E<std::optional<nlohmann::json>>, getValue,
+                (const std::string& key), (const override));
+    MOCK_METHOD(E<void>, setValue, (const std::string& key, nlohmann::json&& value),
                 (const override));
 
 protected:
