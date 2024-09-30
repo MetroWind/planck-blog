@@ -30,8 +30,10 @@ pkgver()
 build()
 {
 	cd "$srcdir/${pkgname%-git}"
+    # Usually CMAKE_BUILD_TYPE is set to be “None” in a PKGBUILD. But
+    # it doesn’t work well with ryml.
     cmake -B build \
-          -DCMAKE_BUILD_TYPE='None' \
+          -DCMAKE_BUILD_TYPE='Release' \
           -DCMAKE_INSTALL_PREFIX='/usr' \
           -Wno-dev .
     # https://github.com/abdes/cryptopp-cmake/issues/125
