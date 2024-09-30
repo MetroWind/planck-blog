@@ -47,13 +47,19 @@ FetchContent_Declare(
   GIT_TAG v1.12.0
 )
 
+FetchContent_Declare(
+  cmark
+  GIT_REPOSITORY https://github.com/commonmark/cmark.git
+  GIT_TAG 0.31.1
+)
+
 set(SPDLOG_USE_STD_FORMAT ON)
-FetchContent_MakeAvailable(json inja httplib cxxopts googletest ryml spdlog)
+FetchContent_MakeAvailable(json inja httplib cxxopts googletest ryml spdlog cmark)
 unset(BUILD_BENCHMARK)
 
 find_package(CURL REQUIRED)
 find_package(SQLite3 REQUIRED)
-find_package(cmark REQUIRED)
+# find_package(cmark REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(libmagic REQUIRED libmagic)
@@ -108,9 +114,7 @@ set(LIBS
   ${SQLite3_LIBRARIES}
   cryptopp::cryptopp
   ${libmagic_LIBRARIES}
-  # This can be found in the installed
-  # cmark-targets-relwithdebinfo.cmake.
-  cmark::cmark
+  cmark
 )
 
 set(INCLUDES
@@ -118,7 +122,6 @@ set(INCLUDES
   ${json_SOURCE_DIR}/single_include
   ${inja_SOURCE_DIR}/single_include/inja
   ${SQLite3_INCLUDE_DIRS}
-  ${cmark_INCLUDE_DIRS}
   ${libmagic_INCLUDE_DIRS}
 )
 
