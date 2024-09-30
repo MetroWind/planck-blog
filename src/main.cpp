@@ -24,7 +24,11 @@ int main(int argc, char** argv)
     cmd_options.add_options()
         ("c,config", "Config file",
          cxxopts::value<std::string>()->default_value("/etc/planck-blog.yaml"))
-        ("legacy-migration", "Migrate the legacy posts from a directory",
+        ("legacy-migration", "Migrate the legacy posts from a directory and exit",
+         cxxopts::value<std::string>())
+        ("set", "Set a runtime setting and exit. Example:"
+         " --set pause-update-time=true. The only setting available right now"
+         " is pause-update-time.",
          cxxopts::value<std::string>())
         ("h,help", "Print this message.");
     auto opts = cmd_options.parse(argc, argv);
@@ -49,6 +53,44 @@ int main(int argc, char** argv)
     {
         auto ok_maybe = migrate(
             opts["legacy-migration"].as<std::string>(), *conf);
+        if(ok_maybe)
+        {
+            return 0;
+        }
+        else
+        {
+            spdlog::error(errorMsg(ok_maybe.error()));
+            return 1;
+        }
+    }
+
+    if(opts.count("set") == 1)
+    {
+        std::string _ = opts["set"].as<std::string>();
+        std::string_view keyvalue(_);
+        auto index = keyvalue.find('=');
+        std::string_view key = strip(keyvalue.substr(0, index));
+        if(key.empty())
+        {
+            spdlog::error("Invalid key");
+            return 1;
+        }
+        nlohmann::json value = parseJSON(strip(keyvalue.substr(index+1)));
+        if(value.is_discarded())
+        {
+            spdlog::error("Invalid value");
+            return 1;
+        }
+        auto data_source = DataSourceSqlite::fromFile(
+            (std::filesystem::path(conf->data_dir) / "data.db").string());
+        if(!data_source.has_value())
+        {
+            spdlog::error("Failed to create data source: {}",
+                          errorMsg(data_source.error()));
+            return 2;
+        }
+        auto ok_maybe = (*data_source)->setValue(std::string(key),
+                                                 std::move(value));
         if(ok_maybe)
         {
             return 0;

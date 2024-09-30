@@ -604,7 +604,7 @@ void App::handleSavePost(const httplib::Request& req, httplib::Response& res)
     }
 
     E<nlohmann::json> value = data->getValueWithDefault(
-        "pause_update_time", false);
+        "pause-update-time", false);
     if(!value.has_value())
     {
         res.status = 500;
