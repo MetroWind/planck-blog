@@ -48,38 +48,38 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
 
     ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(*buffer));
     Configuration config;
-    if(tree["data-dir"].has_key())
+    if(tree["data-dir"].readable())
     {
         tree["data-dir"] >> config.data_dir;
     }
-    if(tree["attachment-dir"].has_key())
+    if(tree["attachment-dir"].readable())
     {
         tree["attachment-dir"] >> config.attachment_dir;
     }
-    if(tree["listen-address"].has_key())
+    if(tree["listen-address"].readable())
     {
         tree["listen-address"] >> config.listen_address;
     }
-    if(tree["listen-port"].has_key())
+    if(tree["listen-port"].readable())
     {
         if(!getYamlValue(tree["listen-port"], config.listen_port))
         {
             return std::unexpected(runtimeError("Invalid port"));
         }
     }
-    if(tree["client-id"].has_key())
+    if(tree["client-id"].readable())
     {
         tree["client-id"] >> config.client_id;
     }
-    if(tree["client-secret"].has_key())
+    if(tree["client-secret"].readable())
     {
         tree["client-secret"] >> config.client_secret;
     }
-    if(tree["openid-url-prefix"].has_key())
+    if(tree["openid-url-prefix"].readable())
     {
         tree["openid-url-prefix"] >> config.openid_url_prefix;
     }
-    if(tree["base-url"].has_key())
+    if(tree["base-url"].readable())
     {
         tree["base-url"] >> config.base_url;
     }
@@ -90,22 +90,22 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
             lang >> config.languages.emplace_back();
         }
     }
-    if(tree["blog-title"].has_key())
+    if(tree["blog-title"].readable())
     {
         tree["blog-title"] >> config.blog_title;
     }
-    if(tree["default-theme"].has_key())
+    if(tree["default-theme"].readable())
     {
         tree["default-theme"] >> config.default_theme;
     }
-    if(tree["substitutions"].has_key())
+    if(tree["substitutions"].readable())
     {
-        if(tree["substitutions"]["nav-center"].has_key())
+        if(tree["substitutions"]["nav-center"].readable())
         {
             tree["substitutions"]["nav-center"] >>
                 config.substitutions.nav_center;
         }
-        if(tree["substitutions"]["after-post"].has_key())
+        if(tree["substitutions"]["after-post"].readable())
         {
             tree["substitutions"]["after-post"] >>
                 config.substitutions.after_post;
