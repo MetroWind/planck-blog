@@ -34,7 +34,12 @@
           </div>
           <div id="PostBody">{{ post.content }}</div>
         </article>
+        <hr/>
+        <div id="AfterPost">
+          {{ after_post }}
+        </div>
       </main>
+      {% include "footer.html" %}
     </div>
   </body>
 </html>

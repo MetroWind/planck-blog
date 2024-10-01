@@ -98,5 +98,19 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     {
         tree["default-theme"] >> config.default_theme;
     }
+    if(tree["substitutions"].has_key())
+    {
+        if(tree["substitutions"]["nav-center"].has_key())
+        {
+            tree["substitutions"]["nav-center"] >>
+                config.substitutions.nav_center;
+        }
+        if(tree["substitutions"]["after-post"].has_key())
+        {
+            tree["substitutions"]["after-post"] >>
+                config.substitutions.after_post;
+        }
+    }
+
     return E<Configuration>{std::in_place, std::move(config)};
 }

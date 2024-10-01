@@ -8,6 +8,12 @@
 
 #include "error.hpp"
 
+struct Substitutions
+{
+    std::string nav_center;
+    std::string after_post;
+};
+
 struct Configuration
 {
     using StringMap = std::unordered_map<std::string, std::string>;
@@ -23,6 +29,7 @@ struct Configuration
     std::vector<std::string> languages;
     std::string blog_title;
     std::string default_theme;
+    Substitutions substitutions;
 
     StringMap vars;
     StringMap custom_vars;

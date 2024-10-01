@@ -1067,6 +1067,8 @@ nlohmann::json App::baseTemplateData(const httplib::Request& req) const
     }
     data["stylesheets"] = theme_manager.stylesheets(theme);
     data["current_theme"] = theme;
+    data["nav_center"] = config.substitutions.nav_center;
+    data["after_post"] = config.substitutions.after_post;
     return data;
 }
 
