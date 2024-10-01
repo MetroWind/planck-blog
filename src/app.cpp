@@ -1,3 +1,5 @@
+#define CPPHTTPLIB_FORM_URL_ENCODED_PAYLOAD_MAX_LENGTH 131072
+
 #include <algorithm>
 #include <ctime>
 #include <exception>
