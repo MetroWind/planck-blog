@@ -376,6 +376,10 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     {
         return URL(base_url).appendPath("select-theme").str();
     }
+    if(name == "feed")
+    {
+        return URL(base_url).appendPath("feed.xml").str();
+    }
     return "";
 }
 
@@ -802,6 +806,28 @@ void App::handleSelectTheme(const httplib::Request& req, httplib::Response& res)
     res.status = 204;
 }
 
+void App::handleFeed(const httplib::Request& req, httplib::Response& res)
+{
+    ASSIGN_OR_RESPOND_ERROR(std::vector<Post> ps, data->getPosts(0, 5), res);
+    nlohmann::json posts_json = nlohmann::json::array();
+    for(Post& p: ps)
+    {
+        ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj,
+                                renderPostToJson(std::move(p)), res);
+        pj["content"] = escapeHTML(pj["content"].get_ref<std::string&>());
+        posts_json.push_back(std::move(pj));
+    }
+    ASSIGN_OR_RESPOND_ERROR(Time latest_update, data->getLatestUpdateTime(),
+                            res);
+    nlohmann::json data = baseTemplateData(req);
+    data.merge_patch({{"posts", std::move(posts_json)},
+                      {"latest_update_time", timeToISO8601(latest_update)}});
+    std::string result = templates.render_file(
+        "feed.xml", std::move(data));
+    res.status = 200;
+    res.set_content(std::move(result), "application/atom+xml");
+}
+
 nlohmann::json App::postToJson(const Post& p) const
 {
     nlohmann::json result;
@@ -813,9 +839,12 @@ nlohmann::json App::postToJson(const Post& p) const
     result["title"] = p.title;
     result["abstract"] = p.abstract;
     result["content"] = p.raw_content;
+    const Time APOCH = secondsToTime(0);
+    Time publish_time = APOCH;
     if(p.publish_time.has_value())
     {
-        result["publish_time"] = timeToSeconds(*p.publish_time);
+        publish_time = *p.publish_time;
+        result["publish_time"] = timeToSeconds(publish_time);
         result["publish_time_str"] = timeToStr(*p.publish_time);
         result["publish_time_iso8601"] = timeToISO8601(*p.publish_time);
     }
@@ -826,9 +855,11 @@ nlohmann::json App::postToJson(const Post& p) const
         result["publish_time_iso8601"] = "";
     }
 
+    Time update_time = APOCH;
     if(p.update_time.has_value())
     {
-        result["update_time"] = timeToSeconds(*p.update_time);
+        update_time = *p.update_time;
+        result["update_time"] = timeToSeconds(update_time);
         result["update_time_str"] = timeToStr(*p.update_time);
         result["update_time_iso8601"] = timeToISO8601(*p.update_time);
     }
@@ -837,6 +868,20 @@ nlohmann::json App::postToJson(const Post& p) const
         result["update_time"] = 0;
         result["update_time_str"] = "";
         result["update_time_iso8601"] = "";
+    }
+
+    const Time& change_time = std::max(update_time, publish_time);
+    if(change_time > APOCH)
+    {
+        result["change_time"] = timeToSeconds(change_time);
+        result["change_time_str"] = timeToStr(change_time);
+        result["change_time_iso8601"] = timeToISO8601(change_time);
+    }
+    else
+    {
+        result["change_time"] = 0;
+        result["change_time_str"] = "";
+        result["change_time_iso8601"] = "";
     }
 
     result["language"] = p.language;
@@ -999,6 +1044,11 @@ void App::setup()
                 [&](const httplib::Request& req, httplib::Response& res)
     {
         handleSelectTheme(req, res);
+    });
+    server.Get(getPath("feed"),
+                [&](const httplib::Request& req, httplib::Response& res)
+    {
+        handleFeed(req, res);
     });
 }
 

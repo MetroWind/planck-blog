@@ -171,3 +171,20 @@ inline std::string_view strip(std::string_view s)
 {
     return rstrip(lstrip(s));
 }
+
+inline std::string escapeHTML(std::string_view s)
+{
+    std::string buffer;
+    buffer.reserve(s.size());
+    for(size_t pos = 0; pos != s.size(); ++pos) {
+        switch(s[pos]) {
+            case '&':  buffer.append("&amp;");       break;
+            case '\"': buffer.append("&quot;");      break;
+            case '\'': buffer.append("&apos;");      break;
+            case '<':  buffer.append("&lt;");        break;
+            case '>':  buffer.append("&gt;");        break;
+            default:   buffer.append(&s[pos], 1); break;
+        }
+    }
+    return buffer;
+}

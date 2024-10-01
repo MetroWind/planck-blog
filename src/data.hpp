@@ -28,6 +28,9 @@ public:
 
     // Get all published posts, newest first.
     virtual E<std::vector<Post>> getPosts() const = 0;
+    // Get a certain number of latest published posts, starting from
+    // the “start”th, newest first.
+    virtual E<std::vector<Post>> getPosts(int start, int count) const = 0;
     // Get one post by ID.
     virtual E<std::optional<Post>> getPost(int64_t id) const = 0;
     // Get the ID, title, abstract, and language of all published
@@ -83,6 +86,9 @@ public:
     virtual E<void> setValue(const std::string& key, nlohmann::json&& value)
         const = 0;
 
+    // Get the time of the latest update (or publish).
+    virtual E<Time> getLatestUpdateTime() const = 0;
+
 protected:
     virtual E<void> setSchemaVersion(int64_t v) const = 0;
 
@@ -107,6 +113,7 @@ public:
     E<int64_t> getSchemaVersion() const override;
 
     E<std::vector<Post>> getPosts() const override;
+    E<std::vector<Post>> getPosts(int start, int count) const override;
     E<std::vector<Post>> getPostExcerpts() const override;
     E<std::optional<Post>> getPost(int64_t id) const override;
     E<void> updatePost(Post&& new_post) const override;
@@ -130,6 +137,9 @@ public:
         const override;
     E<void> setValue(const std::string& key, nlohmann::json&& value)
         const override;
+
+    E<Time> getLatestUpdateTime() const override;
+
     // Do not use.
     DataSourceSqlite() = default;
 

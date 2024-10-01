@@ -58,6 +58,7 @@ public:
                                 httplib::Response& res) const;
     void handleSelectTheme(const httplib::Request& req, httplib::Response& res)
         const;
+    void handleFeed(const httplib::Request& req, httplib::Response& res);
 
     void start();
     void stop();

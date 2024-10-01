@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>{{ blog_title }}</title>
+  <link href="{{ url_for("index") }}"/>
+  <updated>{{ latest_update_time }}</updated>
+  <author>
+    <name>MetroWind</name>
+  </author>
+  <id>{{ url_for("index") }}</id>
+  {% for post in posts %}
+  <entry>
+    <title>{{ post.title }}</title>
+    <link href="{{ url_for("post", post.id) }}" rel="alternate"/>
+    <id>{{ url_for("post", post.id) }}</id>
+    <updated>{{ post.change_time_iso8601 }}</updated>
+    <summary>{{ post.abstract }}</summary>
+    <content>{{ post.content }}</content>
+  </entry>
+  {% endfor %}
+</feed>

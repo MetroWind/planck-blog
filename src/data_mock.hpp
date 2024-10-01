@@ -18,6 +18,8 @@ public:
 
     MOCK_METHOD(E<int64_t>, getSchemaVersion, (), (const override));
     MOCK_METHOD(E<std::vector<Post>>, getPosts, (), (const override));
+    MOCK_METHOD(E<std::vector<Post>>, getPosts, (int start, int count),
+                (const override));
     MOCK_METHOD(E<std::vector<Post>>, getPostExcerpts, (), (const override));
     MOCK_METHOD(E<std::optional<Post>>, getPost, (int64_t id), (const override));
     MOCK_METHOD(E<void>, updatePost, (Post&& new_post), (const override));
@@ -43,8 +45,10 @@ public:
                 (const override));
     MOCK_METHOD(E<std::optional<nlohmann::json>>, getValue,
                 (const std::string& key), (const override));
-    MOCK_METHOD(E<void>, setValue, (const std::string& key, nlohmann::json&& value),
+    MOCK_METHOD(E<void>, setValue,
+                (const std::string& key, nlohmann::json&& value),
                 (const override));
+    MOCK_METHOD(E<Time>, getLatestUpdateTime, (), (const override));
 
 protected:
     E<void> setSchemaVersion([[maybe_unused]] int64_t v) const override

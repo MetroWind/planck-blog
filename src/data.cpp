@@ -109,6 +109,13 @@ E<std::vector<Post>> DataSourceSqlite::getPosts() const
     return filterPosts("WHERE publish_time != 0 ORDER BY publish_time DESC");
 }
 
+E<std::vector<Post>> DataSourceSqlite::getPosts(int start, int count) const
+{
+    return filterPosts(std::format(
+        "WHERE publish_time != 0 ORDER BY publish_time DESC LIMIT {} OFFSET {}",
+        count, start));
+}
+
 E<std::optional<Post>> DataSourceSqlite::getPost(int64_t id) const
 {
     ASSIGN_OR_RETURN(std::vector<Post> ps, filterPosts(
@@ -481,4 +488,23 @@ E<void> DataSourceSqlite::setValue(const std::string& key,
         return std::unexpected(runtimeError("Failed to set value."));
     }
     return {};
+}
+
+E<Time> DataSourceSqlite::getLatestUpdateTime() const
+{
+    ASSIGN_OR_RETURN(auto rows, (db->eval<int64_t, int64_t>(
+        "SELECT publish_time, update_time FROM Posts;")));
+    int64_t max_time = 0;
+    for(const auto& row: rows)
+    {
+        if(std::get<0>(row) > max_time)
+        {
+            max_time = std::get<0>(row);
+        }
+        if(std::get<1>(row) > max_time)
+        {
+            max_time = std::get<1>(row);
+        }
+    }
+    return secondsToTime(max_time);
 }

@@ -1,3 +1,4 @@
+#include "gmock/gmock.h"
 #include <httplib.h>
 #include <memory>
 #include <vector>
@@ -365,6 +366,24 @@ TEST_F(UserAppTest, CanHandleAttachment)
 
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_EQ(res->payloadAsStr().size(), 313);
+    }
+    app->stop();
+    app->wait();
+}
+
+TEST_F(UserAppTest, CanHandleFeed)
+{
+    std::vector<Post> ps;
+    EXPECT_CALL(*data_source, getPosts(0, 5)).WillOnce(Return(ps));
+    app->start();
+    {
+        HTTPSession client;
+        ASSIGN_OR_FAIL(const HTTPResponse* res,
+                       client.get("http://localhost:8080/blog/feed.xml"));
+
+        EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("<feed xmlns=\"http://www.w3.org/2005/Atom\">"));
     }
     app->stop();
     app->wait();
