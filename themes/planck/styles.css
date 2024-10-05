@@ -1,5 +1,8 @@
 @import url("../../statics/fonts/iosevka-etoile/IosevkaEtoile.css");
 @import url("../../statics/fonts/iosevka/IosevkaSS10.css");
+@import url("https://cdn.jsdelivr.net/gh/satouriko/LxgwWenKai_Webfonts@v1.101/dist/LXGWWenKai-Regular.css");
+@import url("https://cdn.jsdelivr.net/gh/satouriko/LxgwWenKai_Webfonts@v1.101/dist/LXGWWenKai-Light.css");
+@import url("https://cdn.jsdelivr.net/gh/satouriko/LxgwWenKai_Webfonts@v1.101/dist/LXGWWenKai-Bold.css");
 
 body
 {
@@ -32,11 +35,6 @@ code, pre
 {
     font-family: "Iosevka SS10 Web", monospace;
     font-size: 95%;
-}
-
-pre, ul, ol
-{
-    margin: 0.8em 0;
 }
 
 nav ul
@@ -164,19 +162,37 @@ h1.PostTitle > a
     font-weight: bold;
 }
 
-#Post[lang^="zh-"], #Post[lang="zh"]
-{
-    line-height: 1.65;
-}
-
-#Post[lang^="zh-"] ul, #Post[lang^="zh-"] ol, #Post[lang="zh"] ul, #Post[lang="zh"] ol
-{
-    margin-left: 2em;
-}
-
 #PostBody
 {
     margin: 1em 0 3em 0;
+
+    pre, ul, ol, blockquote
+    {
+        margin: 0.8em 0;
+    }
+
+    blockquote
+    {
+        color: var(--color-alt-fg);
+        font-style: italic;
+    }
+
+}
+
+#Post[lang^="zh-"], #Post[lang="zh"]
+{
+    line-height: 1.65;
+
+    ul, ol
+    {
+        margin-left: 2em;
+    }
+
+    blockquote
+    {
+        font-family: LXGWWenKai;
+        font-style: normal;
+    }
 }
 
 #AfterPost
