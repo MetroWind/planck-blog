@@ -263,6 +263,8 @@ App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
         base_url = *std::move(u);
     }
 
+    // The default is “##”, which conflicts the markdown title.
+    templates.set_line_statement("#%");
     templates.add_callback("url_for", [&](const inja::Arguments& args) ->
                            std::string
     {
