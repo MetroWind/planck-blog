@@ -8,8 +8,8 @@
 #include "error.hpp"
 
 // Render a post to bare HTML (HTML that only contains the post
-// itself). This also does template substitution to the content of the
-// post.
+// itself). This does not do template substitution to the content of
+// the post.
 E<std::string> renderPost(const Post& p, const Configuration& conf);
 
 // TODO: thread-safty

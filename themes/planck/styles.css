@@ -200,6 +200,26 @@ h1.PostTitle > a
     margin: 3em 0;
 }
 
+main:has(> #PostEdit)
+{
+    max-width: unset;
+}
+
+#PostEdit
+{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+
+}
+
+#PostEdit > *
+{
+    max-width: 700px;
+    flex-grow: 1;
+}
+
 #FormPost
 {
     margin: 2rem 0;

@@ -556,10 +556,14 @@ void App::handleEditDraftFrontEnd(const httplib::Request& req,
         return;
     }
 
+    Post pp = *p;
+    ASSIGN_OR_RESPOND_ERROR(nlohmann::json preview,
+                            renderPostToJson(std::move(pp), false), res);
     nlohmann::json data = baseTemplateData(req);
     data.merge_patch({{"languages", config.languages},
                       {"session_user", session->user.name},
-                      {"post", postToJson(*p)}});
+                      {"post", postToJson(*p)},
+                      {"preview", preview["content"]}});
     std::string result = templates.render_file(
         "edit_draft.html", std::move(data));
     res.status = 200;
@@ -587,10 +591,14 @@ void App::handleEditPostFrontEnd(const httplib::Request& req,
         return;
     }
 
+    Post pp = *p;
+    ASSIGN_OR_RESPOND_ERROR(nlohmann::json preview,
+                            renderPostToJson(std::move(pp), false), res);
     nlohmann::json data = baseTemplateData(req);
     data.merge_patch({{"languages", config.languages},
                       {"session_user", session->user.name},
-                      {"post", postToJson(*p)}});
+                      {"post", postToJson(*p)},
+                      {"preview", preview["content"]}});
     std::string result = templates.render_file(
         "edit_post.html", std::move(data));
     res.status = 200;
@@ -894,7 +902,7 @@ nlohmann::json App::postToJson(const Post& p) const
     return result;
 }
 
-E<nlohmann::json> App::renderPostToJson(Post&& p)
+E<nlohmann::json> App::renderPostToJson(Post&& p, bool use_cache)
 {
     nlohmann::json result = postToJson(p);
     // Do template substitution in the post content. This allows
@@ -911,8 +919,16 @@ E<nlohmann::json> App::renderPostToJson(Post&& p)
             "Failed to do template substitution on the post content: {}",
             e.message);
     }
-    ASSIGN_OR_RETURN(result["content"], post_cache.renderPost(p));
-    return result;
+    if(use_cache)
+    {
+        ASSIGN_OR_RETURN(result["content"], post_cache.renderPost(p));
+        return result;
+    }
+    else
+    {
+        ASSIGN_OR_RETURN(result["content"], renderPost(p, config));
+        return result;
+    }
 }
 
 std::string App::getPath(const std::string& name,

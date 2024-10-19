@@ -100,7 +100,7 @@ private:
         bool allow_error_and_invalid=false) const;
 
     nlohmann::json postToJson(const Post& p) const;
-    E<nlohmann::json> renderPostToJson(Post&& p);
+    E<nlohmann::json> renderPostToJson(Post&& p, bool use_cache=true);
 
     // This gives a path, optionally with the name of an argument,
     // that is suitable to bind to a URL handler. For example,
