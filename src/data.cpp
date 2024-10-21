@@ -344,7 +344,7 @@ E<std::vector<Attachment>> DataSourceSqlite::getAttachments() const
     ASSIGN_OR_RETURN(
         auto rows, (db->eval<std::string, std::string, int64_t, std::string>(
             "SELECT original_name, hash, upload_time, content_type FROM "
-            "Attachments;")));
+            "Attachments ORDER BY upload_time DESC;")));
     std::vector<Attachment> result;
     for(const auto& row: rows)
     {

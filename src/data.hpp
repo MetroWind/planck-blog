@@ -65,7 +65,7 @@ public:
     // Get one attachment by hash.
     virtual E<std::optional<Attachment>>
     getAttachment(const std::string& hash) const = 0;
-    // Get all attachments in no particular order.
+    // Get all attachments, sorted from newest to oldest.
     virtual E<std::vector<Attachment>> getAttachments() const = 0;
     // Delete an attachment by hash.
     virtual E<void> deleteAttachment(const std::string& hash) const = 0;
