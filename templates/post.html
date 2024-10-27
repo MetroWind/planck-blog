@@ -12,33 +12,35 @@
   <body>
     <div id="Body">
       {% include "nav.html" %}
-      <header id="BlogTitle">
-        <h1><a href="{{ url_for("index") }}">{{ blog_title }}</a></h1>
-      </header>
-      <main>
-        <article id="Post" lang="{{ post.language }}">
-          <h1>{{ post.title }}</h1>
-          <div id="Metadata">
-            By <span id="Author">{{ post.author }}</span>
-            @<time datetime="{{ post.publish_time_iso8601 }}">
-              {{ post.publish_time_str }}
-            </time>
-            {% if length(post.update_time_str) > 0 %}
-            Updated @<time datetime="{{ post.update_time_iso8601 }}">
-              {{ post.update_time_str }}
-            </time>
-            {% endif %}
-            {% if length(session_user) > 0 %}
-            <a href="{{ url_for("edit-post", post.id) }}">[EDIT]</a>
-            {% endif %}
+      <div id="ContentWrapper">
+        <header id="BlogTitle">
+          <h1><a href="{{ url_for("index") }}">{{ blog_title }}</a></h1>
+        </header>
+        <main id="PostMain">
+          <article id="Post" lang="{{ post.language }}">
+            <h1>{{ post.title }}</h1>
+            <div id="Metadata">
+              By <span id="Author">{{ post.author }}</span>
+              @<time datetime="{{ post.publish_time_iso8601 }}">
+                {{ post.publish_time_str }}
+              </time>
+              {% if length(post.update_time_str) > 0 %}
+              Updated @<time datetime="{{ post.update_time_iso8601 }}">
+                {{ post.update_time_str }}
+              </time>
+              {% endif %}
+              {% if length(session_user) > 0 %}
+              <a href="{{ url_for("edit-post", post.id) }}">[EDIT]</a>
+              {% endif %}
+            </div>
+            <div id="PostBody">{{ post.content }}</div>
+          </article>
+          <hr/>
+          <div id="AfterPost">
+            {{ after_post }}
           </div>
-          <div id="PostBody">{{ post.content }}</div>
-        </article>
-        <hr/>
-        <div id="AfterPost">
-          {{ after_post }}
-        </div>
-      </main>
+        </main>
+      </div>
       {% include "footer.html" %}
     </div>
   </body>

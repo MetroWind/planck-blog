@@ -11,19 +11,21 @@
   <body>
     <div id="Body">
       {% include "nav.html" %}
-      <header id="BlogTitle">
-        <h1>{{ blog_title }}</h1>
-      </header>
-      <main>
-        <ul id="PostList">
-          {% for post in posts %}
-          <li lang="{{ post.language }}"><hgroup>
-              <h1 class="PostTitle"><a href="{{ url_for("post", post.id) }}">{{ post.title }}</a></h1>
-              <p class="Abstract">{{ post.abstract }}</p>
-          </hgroup></li>
-          {% endfor %}
-        </ul>
-      </main>
+      <div id="ContentWrapper">
+        <header id="BlogTitle">
+          <h1>{{ blog_title }}</h1>
+        </header>
+        <main>
+          <ul id="PostList">
+            {% for post in posts %}
+            <li lang="{{ post.language }}"><hgroup>
+                <h1 class="PostTitle"><a href="{{ url_for("post", post.id) }}">{{ post.title }}</a></h1>
+                <p class="Abstract">{{ post.abstract }}</p>
+            </hgroup></li>
+            {% endfor %}
+          </ul>
+        </main>
+      </div>
       {% include "footer.html" %}
     </div>
   </body>

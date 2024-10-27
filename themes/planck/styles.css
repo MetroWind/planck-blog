@@ -16,7 +16,8 @@ nav, footer
 {
     background-color: var(--color-alt-bg);
     font-size: 80%;
-    padding: 4px 1em;
+    padding: 0px 1em;
+    height: 32px;
 }
 
 a
