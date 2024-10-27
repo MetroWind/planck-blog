@@ -300,3 +300,19 @@ URL& URL::appendPath(std::string_view appendant)
     }
     return path((existing_path + "/" + std::string(to_append)).c_str());
 }
+
+std::string URL::encode(std::string_view s)
+{
+    char* r = curl_easy_escape(nullptr, s.data(), s.size());
+    std::string result(r);
+    curl_free(r);
+    return result;
+}
+
+std::string URL::decode(std::string_view s)
+{
+    char* r = curl_easy_unescape(nullptr, s.data(), s.size(), 0);
+    std::string result(r);
+    curl_free(r);
+    return result;
+}

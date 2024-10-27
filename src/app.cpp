@@ -336,7 +336,8 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
                 if(att_maybe->has_value())
                 {
                     return URL(base_url).appendPath("attachment")
-                        .appendPath(arg).appendPath((*att_maybe)->original_name)
+                        .appendPath(arg).appendPath(
+                            URL::encode((*att_maybe)->original_name))
                         .str();
                 }
             }

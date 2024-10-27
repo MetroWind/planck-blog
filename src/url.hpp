@@ -52,6 +52,9 @@ public:
     // Whether this object contains a valid URL
     bool valid() const { return url != nullptr; }
 
+    static std::string encode(std::string_view s);
+    static std::string decode(std::string_view s);
+
 private:
     void init();
     CURLU* url;
