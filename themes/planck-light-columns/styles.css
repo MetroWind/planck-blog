@@ -6,12 +6,22 @@
         width: 100%;
     }
 
+    footer
+    {
+        top: calc(100vh - 32px);
+    }
+
     main#PostMain, #BlogTitle
     {
         max-width: unset;
     }
 
-    #ContentWrapper
+    #IndexWrapper
+    {
+        padding: 32px;
+    }
+
+    #PostWrapper
     {
         columns: auto 700px;
         height: calc(100vh - 32px);
