@@ -64,9 +64,17 @@ p:first-of-type, pre p, h2 + p, h3 + p, h4 + p, h5 + p, h6 + p
     text-indent: unset;
 }
 
+#Post p
+{
+    text-align: justify;
+    hyphens: auto;
+}
+
 #Post[lang^="zh-"] p, #Post[lang="zh"] p
 {
     text-indent: 2em;
+    text-align: unset;
+    hyphens: unset;
 }
 
 #Post[lang^="zh-"] li > p, #Post[lang="zh"] li > p
