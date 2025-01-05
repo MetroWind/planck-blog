@@ -1117,6 +1117,5 @@ void App::stop()
 
 void App::wait()
 {
-    while(!should_stop && server.is_running());
     server_thread.join();
 }
