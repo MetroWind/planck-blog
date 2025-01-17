@@ -26,7 +26,7 @@ jobs:
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 60 --slave /usr/bin/g++ g++ /usr/bin/g++-13
 
     - name: Install dependencies
-      run: "sudo apt install -y curl libcurl4-openssl-dev sqlite3 libsqlite3-dev cmark libcmark-dev asciidoctor"
+      run: "sudo apt install -y curl libcurl4-openssl-dev sqlite3 libsqlite3-dev cmark libcmark-dev asciidoctor libmagic-dev"
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
