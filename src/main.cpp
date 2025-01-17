@@ -28,6 +28,8 @@ int main(int argc, char** argv)
          cxxopts::value<std::string>())
         ("delete-post", "Delete a post or draft by ID and exit",
          cxxopts::value<int64_t>())
+        ("delete-attachment", "Delete an attachment by hash and exit",
+         cxxopts::value<std::string>())
         ("set", "Set a runtime setting and exit. Example:"
          " --set pause-update-time=true. The only setting available right now"
          " is pause-update-time.",
@@ -78,6 +80,29 @@ int main(int argc, char** argv)
             return 2;
         }
         E<void> ok_maybe = (*data_source)->deletePost(id);
+        if(ok_maybe)
+        {
+            return 0;
+        }
+        else
+        {
+            spdlog::error(errorMsg(ok_maybe.error()));
+            return 1;
+        }
+    }
+
+    if(opts.count("delete-attachment") == 1)
+    {
+        std::string hash = opts["delete-attachment"].as<std::string>();
+        auto data_source = DataSourceSqlite::fromFile(
+            (std::filesystem::path(conf->data_dir) / "data.db").string());
+        if(!data_source.has_value())
+        {
+            spdlog::error("Failed to create data source: {}",
+                          errorMsg(data_source.error()));
+            return 2;
+        }
+        E<void> ok_maybe = (*data_source)->deleteAttachment(std::move(hash));
         if(ok_maybe)
         {
             return 0;
