@@ -22,12 +22,15 @@
         </tr>
         {% for att in attachments %}
         <tr>
-          <td class="Hash"><a href="{{ att.url }}">{{ att.hash }}</a></td>
+          <td class="Hash">
+            <a href="{{ att.url }}">{{ att.hash }}</a>
+          </td>
           <td class="Filename">{{ att.original_name }}</td>
           <td class="ContentType">{{ att.content_type }}</td>
           <td><time datetime="{{ att.upload_time_iso8601 }}">
               {{ att.upload_time_str }}
           </time></td>
+          <td><a href="#" onclick='navigator.clipboard.writeText("url_for(\"attachment\", \"{{ att.hash }}\")")' title="Copy url_for call">📋</a></td>
         </tr>
         {% endfor %}
       </ul>
