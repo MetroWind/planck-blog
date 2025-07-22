@@ -4,6 +4,11 @@
 @import url("https://cdn.jsdelivr.net/gh/satouriko/LxgwWenKai_Webfonts@v1.101/dist/LXGWWenKai-Light.css");
 @import url("https://cdn.jsdelivr.net/gh/satouriko/LxgwWenKai_Webfonts@v1.101/dist/LXGWWenKai-Bold.css");
 
+:root
+{
+    --text-width: 700px;
+}
+
 body
 {
     background-color: var(--color-bg);
@@ -121,7 +126,7 @@ hr
 
 main, #BlogTitle
 {
-    max-width: 700px;
+    max-width: var(--text-width);
     margin: 0 auto;
 }
 
@@ -225,7 +230,7 @@ main:has(> #PostEdit)
 
 #PostEdit > *
 {
-    max-width: 700px;
+    max-width: var(--text-width);
     flex-grow: 1;
 }
 
@@ -259,7 +264,7 @@ main:has(> #PostEdit)
 
 #FormUpload
 {
-    max-width: 700px;
+    max-width: var(--text-width);
     margin: 2em auto;
 }
 

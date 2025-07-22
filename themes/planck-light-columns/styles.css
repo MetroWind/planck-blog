@@ -1,4 +1,4 @@
-@media (min-width: 700px)
+@media (min-width: 1460)        /* text_width * 2 + column_gap */
 {
     nav, footer
     {
@@ -24,10 +24,10 @@
 
     #PostWrapper
     {
-        columns: auto 700px;
+        columns: auto var(--text-width);
         height: calc(100vh - 32px);
         padding: 64px 32px 32px 32px;
-        max-width: 700px;
+        max-width: var(--text-width);
         column-gap: 60px;
     }
 }
