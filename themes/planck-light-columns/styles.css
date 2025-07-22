@@ -1,4 +1,4 @@
-@media (min-width: 1460)        /* text_width * 2 + column_gap */
+@media (min-width: 1460px)        /* text_width * 2 + column_gap */
 {
     nav, footer
     {
