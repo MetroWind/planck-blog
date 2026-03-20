@@ -9,9 +9,9 @@
 
 #include "config.hpp"
 #include "data.hpp"
-#include "error.hpp"
+#include <mw/error.hpp>
 #include "post.hpp"
-#include "utils.hpp"
+#include <mw/utils.hpp>
 
 namespace fs = std::filesystem;
 
@@ -44,7 +44,7 @@ inline Post readLegacyPost(const fs::path& filename)
             if(key == "Language")
             {
                 std::string lang(value);
-                toLower(lang);
+                mw::toLower(lang);
                 if(lang == "zh")
                 {
                     p.language = "zh-CN";
@@ -58,19 +58,19 @@ inline Post readLegacyPost(const fs::path& filename)
             {
                 p.title = value;
             }
-            else if(key == "Time")
+            else if(key == "mw::Time")
             {
                 std::tm tm;
                 std::stringstream ss{std::string(value)};
                 ss >> std::get_time(&tm, "%Y-%m-%d %H:%M");
-                p.publish_time = Clock::from_time_t(std::mktime(&tm));
+                p.publish_time = mw::Clock::from_time_t(std::mktime(&tm));
             }
             else if(key == "Updated")
             {
                 std::tm tm;
                 std::stringstream ss{std::string(value)};
                 ss >> std::get_time(&tm, "%Y-%m-%d %H:%M");
-                p.update_time = Clock::from_time_t(std::mktime(&tm));
+                p.update_time = mw::Clock::from_time_t(std::mktime(&tm));
             }
             else if(key == "Renderer")
             {
@@ -108,7 +108,7 @@ inline std::vector<Post> discoverPosts(const fs::path& post_dir)
     return ps;
 }
 
-inline E<void> migrate(const fs::path& post_dir, const Configuration& config)
+inline mw::E<void> migrate(const fs::path& post_dir, const Configuration& config)
 {
     ASSIGN_OR_RETURN(auto data_source, DataSourceSqlite::fromFile(
         (std::filesystem::path(config.data_dir) / "data.db").string()));

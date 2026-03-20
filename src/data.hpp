@@ -9,10 +9,11 @@
 
 #include <sqlite3.h>
 
+#include <nlohmann/json.hpp>
 #include "attachment.hpp"
-#include "database.hpp"
+#include <mw/database.hpp>
 #include "post.hpp"
-#include "error.hpp"
+#include <mw/error.hpp>
 
 class DataSourceInterface
 {
@@ -24,133 +25,133 @@ public:
     // from 1. Every time the schema change, someone should increase
     // this number by 1, manually, by hand. The intended use is to
     // help with database migration.
-    virtual E<int64_t> getSchemaVersion() const = 0;
+    virtual mw::E<int64_t> getSchemaVersion() const = 0;
 
     // Get all published posts, newest first.
-    virtual E<std::vector<Post>> getPosts() const = 0;
+    virtual mw::E<std::vector<Post>> getPosts() const = 0;
     // Get a certain number of latest published posts, starting from
     // the “start”th, newest first.
-    virtual E<std::vector<Post>> getPosts(int start, int count) const = 0;
+    virtual mw::E<std::vector<Post>> getPosts(int start, int count) const = 0;
     // Get one post by ID.
-    virtual E<std::optional<Post>> getPost(int64_t id) const = 0;
+    virtual mw::E<std::optional<Post>> getPost(int64_t id) const = 0;
     // Get the ID, title, abstract, and language of all published
     // posts, newest first.
-    virtual E<std::vector<Post>> getPostExcerpts() const = 0;
+    virtual mw::E<std::vector<Post>> getPostExcerpts() const = 0;
 
     // Update an existing post. The reason this (and saveDraft())
     // takes an rvalue is that the post will acquire a new update
     // time, and thus invalidate the post object, meaning the post
     // object is no longer correct.
-    virtual E<void> updatePost(Post&& new_post) const = 0;
+    virtual mw::E<void> updatePost(Post&& new_post) const = 0;
     // Similar to updatePost() but do not change update_time.
-    virtual E<void> updatePostNoUpdateTime(const Post& new_post) const = 0;
+    virtual mw::E<void> updatePostNoUpdateTime(const Post& new_post) const = 0;
     // Create a new draft. A draft is just a post with a zero publish
     // time.
-    virtual E<int64_t> saveDraft(Post&& new_post) const = 0;
+    virtual mw::E<int64_t> saveDraft(Post&& new_post) const = 0;
     // Get all drafts in no particular order.
-    virtual E<std::vector<Post>> getDrafts() const = 0;
+    virtual mw::E<std::vector<Post>> getDrafts() const = 0;
     // Get one draft by ID.
-    virtual E<std::optional<Post>> getDraft(int64_t id) const = 0;
+    virtual mw::E<std::optional<Post>> getDraft(int64_t id) const = 0;
     // Update an existing draft.
-    virtual E<void> editDraft(const Post& draft) const = 0;
+    virtual mw::E<void> editDraft(const Post& draft) const = 0;
     // Publish a draft with “id” into a post. This just changes the
     // update time to current time.
-    virtual E<void> publishPost(int64_t id) const = 0;
+    virtual mw::E<void> publishPost(int64_t id) const = 0;
     // Delete a post or draft by ID.
-    virtual E<void> deletePost(int64_t id) const = 0;
+    virtual mw::E<void> deletePost(int64_t id) const = 0;
 
     // Add an attachment. If the hash already exists, do nothing and
     // return void.
-    virtual E<void> addAttachment(Attachment&& att) const = 0;
+    virtual mw::E<void> addAttachment(Attachment&& att) const = 0;
     // Get one attachment by hash.
-    virtual E<std::optional<Attachment>>
+    virtual mw::E<std::optional<Attachment>>
     getAttachment(const std::string& hash) const = 0;
     // Get all attachments, sorted from newest to oldest.
-    virtual E<std::vector<Attachment>> getAttachments() const = 0;
+    virtual mw::E<std::vector<Attachment>> getAttachments() const = 0;
     // Delete an attachment by hash.
-    virtual E<void> deleteAttachment(const std::string& hash) const = 0;
+    virtual mw::E<void> deleteAttachment(const std::string& hash) const = 0;
     // Get all referrals of an attachment.
-    virtual E<ReferralCounts> getReferralsOfAttachment(const std::string& hash)
+    virtual mw::E<ReferralCounts> getReferralsOfAttachment(const std::string& hash)
         const = 0;
-    // Increase the request count of an attachment from a specific URL
+    // Increase the request count of an attachment from a specific mw::URL
     // by one. If there is no such referral, set the count to one.
-    virtual E<void> addAttachmentReferral(const std::string& attachment_hash,
+    virtual mw::E<void> addAttachmentReferral(const std::string& attachment_hash,
                                           const std::string& url) const = 0;
 
     // The data source can act as a key-value store that stores JSON
     // values. This function retrieves a value from the store.
-    virtual E<std::optional<nlohmann::json>> getValue(const std::string& key)
+    virtual mw::E<std::optional<nlohmann::json>> getValue(const std::string& key)
         const = 0;
-    E<nlohmann::json> getValueWithDefault(
+    mw::E<nlohmann::json> getValueWithDefault(
         const std::string& key, nlohmann::json&& default_value) const;
-    virtual E<void> setValue(const std::string& key, nlohmann::json&& value)
+    virtual mw::E<void> setValue(const std::string& key, nlohmann::json&& value)
         const = 0;
 
     // Get the time of the latest update (or publish).
-    virtual E<Time> getLatestUpdateTime() const = 0;
+    virtual mw::E<mw::Time> getLatestUpdateTime() const = 0;
 
 protected:
-    virtual E<void> setSchemaVersion(int64_t v) const = 0;
+    virtual mw::E<void> setSchemaVersion(int64_t v) const = 0;
 
 };
 
 class DataSourceSqlite : public DataSourceInterface
 {
 public:
-    explicit DataSourceSqlite(std::unique_ptr<SQLite> conn)
+    explicit DataSourceSqlite(std::unique_ptr<mw::SQLite> conn)
             : db(std::move(conn)) {}
 
     ~DataSourceSqlite() override = default;
     DataSourceSqlite(const DataSourceSqlite&) = delete;
     DataSourceSqlite& operator=(const DataSourceSqlite&) = delete;
 
-    static E<std::unique_ptr<DataSourceSqlite>>
+    static mw::E<std::unique_ptr<DataSourceSqlite>>
     fromFile(const std::string& db_file);
-    static E<std::unique_ptr<DataSourceSqlite>> newFromMemory();
+    static mw::E<std::unique_ptr<DataSourceSqlite>> newFromMemory();
 
     // We use the user_version pragma for the schema version. In
-    // SQLite this is only 32 bits.
-    E<int64_t> getSchemaVersion() const override;
+    // mw::SQLite this is only 32 bits.
+    mw::E<int64_t> getSchemaVersion() const override;
 
-    E<std::vector<Post>> getPosts() const override;
-    E<std::vector<Post>> getPosts(int start, int count) const override;
-    E<std::vector<Post>> getPostExcerpts() const override;
-    E<std::optional<Post>> getPost(int64_t id) const override;
-    E<void> updatePost(Post&& new_post) const override;
-    E<void> updatePostNoUpdateTime(const Post& new_post) const override;
-    E<int64_t> saveDraft(Post&& new_post) const override;
-    E<std::vector<Post>> getDrafts() const override;
-    E<std::optional<Post>> getDraft(int64_t id) const override;
-    E<void> editDraft(const Post& draft) const override;
-    E<void> publishPost(int64_t id) const override;
-    E<void> deletePost(int64_t id) const override;
-    E<void> addAttachment(Attachment&& att) const override;
-    E<std::optional<Attachment>> getAttachment(const std::string& hash)
+    mw::E<std::vector<Post>> getPosts() const override;
+    mw::E<std::vector<Post>> getPosts(int start, int count) const override;
+    mw::E<std::vector<Post>> getPostExcerpts() const override;
+    mw::E<std::optional<Post>> getPost(int64_t id) const override;
+    mw::E<void> updatePost(Post&& new_post) const override;
+    mw::E<void> updatePostNoUpdateTime(const Post& new_post) const override;
+    mw::E<int64_t> saveDraft(Post&& new_post) const override;
+    mw::E<std::vector<Post>> getDrafts() const override;
+    mw::E<std::optional<Post>> getDraft(int64_t id) const override;
+    mw::E<void> editDraft(const Post& draft) const override;
+    mw::E<void> publishPost(int64_t id) const override;
+    mw::E<void> deletePost(int64_t id) const override;
+    mw::E<void> addAttachment(Attachment&& att) const override;
+    mw::E<std::optional<Attachment>> getAttachment(const std::string& hash)
         const override;
-    E<std::vector<Attachment>> getAttachments() const override;
-    E<void> deleteAttachment(const std::string& hash) const override;
-    E<ReferralCounts> getReferralsOfAttachment(const std::string& hash)
+    mw::E<std::vector<Attachment>> getAttachments() const override;
+    mw::E<void> deleteAttachment(const std::string& hash) const override;
+    mw::E<ReferralCounts> getReferralsOfAttachment(const std::string& hash)
         const override;
-    E<void> addAttachmentReferral(const std::string& attachment_hash,
+    mw::E<void> addAttachmentReferral(const std::string& attachment_hash,
                                   const std::string& url) const override;
-    E<std::optional<nlohmann::json>> getValue(const std::string& key)
+    mw::E<std::optional<nlohmann::json>> getValue(const std::string& key)
         const override;
-    E<void> setValue(const std::string& key, nlohmann::json&& value)
+    mw::E<void> setValue(const std::string& key, nlohmann::json&& value)
         const override;
 
-    E<Time> getLatestUpdateTime() const override;
+    mw::E<mw::Time> getLatestUpdateTime() const override;
 
     // Do not use.
     DataSourceSqlite() = default;
 
-    E<void> forceSetPostTimes(int64_t id, const Time& publish,
-                              const std::optional<Time>& update) const;
+    mw::E<void> forceSetPostTimes(int64_t id, const mw::Time& publish,
+                              const std::optional<mw::Time>& update) const;
 
 protected:
-    E<void> setSchemaVersion(int64_t v) const override;
+    mw::E<void> setSchemaVersion(int64_t v) const override;
 
 private:
-    std::unique_ptr<SQLite> db;
+    std::unique_ptr<mw::SQLite> db;
 
-    E<std::vector<Post>> filterPosts(std::string_view sql_suffix) const;
+    mw::E<std::vector<Post>> filterPosts(std::string_view sql_suffix) const;
 };

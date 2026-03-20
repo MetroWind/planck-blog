@@ -6,10 +6,10 @@
 
 #include "attachment.hpp"
 #include "data.hpp"
-#include "error.hpp"
-#include "utils.hpp"
+#include <mw/error.hpp>
+#include <mw/utils.hpp>
 #include "post.hpp"
-#include "test_utils.hpp"
+#include <mw/test_utils.hpp>
 
 using ::testing::IsEmpty;
 
@@ -97,7 +97,7 @@ TEST(DataSource, CanAddAndDeleteAttachments)
         EXPECT_EQ(atts[0].content_type, "aaa");
         EXPECT_EQ(atts[0].hash, "bbb");
         EXPECT_EQ(atts[0].original_name, "ccc");
-        EXPECT_GT(timeToSeconds(atts[0].upload_time), 0);
+        EXPECT_GT(mw::timeToSeconds(atts[0].upload_time), 0);
     }
     {
         ASSIGN_OR_FAIL(std::optional<Attachment> att, data->getAttachment("bbb"));
@@ -105,7 +105,7 @@ TEST(DataSource, CanAddAndDeleteAttachments)
         EXPECT_EQ(att->content_type, "aaa");
         EXPECT_EQ(att->hash, "bbb");
         EXPECT_EQ(att->original_name, "ccc");
-        EXPECT_GT(timeToSeconds(att->upload_time), 0);
+        EXPECT_GT(mw::timeToSeconds(att->upload_time), 0);
     }
     {
         EXPECT_TRUE(isExpected(data->deleteAttachment("bbb")));

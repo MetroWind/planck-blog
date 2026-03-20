@@ -7,8 +7,8 @@
 #include <ryml_std.hpp>
 
 #include "theme.hpp"
-#include "error.hpp"
-#include "utils.hpp"
+#include <mw/error.hpp>
+#include <mw/utils.hpp>
 
 namespace fs = std::filesystem;
 
@@ -16,14 +16,14 @@ namespace
 {
 constexpr char THEME_INFO_FILE_NAME[] = "info.yaml";
 
-E<Theme> readThemeDir(const fs::path& dir)
+mw::E<Theme> readThemeDir(const fs::path& dir)
 {
     // Read theme info from the info file.
     std::ifstream file(dir / THEME_INFO_FILE_NAME);
     std::vector<char> buffer(std::istreambuf_iterator<char>{file}, {});
     if(file.bad() || file.fail())
     {
-        return std::unexpected(runtimeError("Failed to read theme info"));
+        return std::unexpected(mw::runtimeError("Failed to read theme info"));
     }
     file.close();
 
@@ -48,7 +48,7 @@ E<Theme> readThemeDir(const fs::path& dir)
     {
         fs::path path = entry.path();
         std::string ext = path.extension();
-        if(toLower(ext) != ".css")
+        if(mw::toLower(ext) != ".css")
         {
             continue;
         }
@@ -60,7 +60,7 @@ E<Theme> readThemeDir(const fs::path& dir)
 
 } // namespace
 
-E<void> ThemeManager::loadDir(const std::filesystem::path& dir)
+mw::E<void> ThemeManager::loadDir(const std::filesystem::path& dir)
 {
     for(const fs::directory_entry& entry: fs::directory_iterator(dir))
     {
@@ -89,7 +89,7 @@ E<void> ThemeManager::loadDir(const std::filesystem::path& dir)
         const auto it = themes.find(theme.parent_name);
         if(it == themes.end())
         {
-            return std::unexpected(runtimeError(
+            return std::unexpected(mw::runtimeError(
                 std::format("Couldn’t find theme {}’s parent, {}",
                             theme.name, theme.parent_name)));
         }

@@ -5,7 +5,7 @@
 #include <magic.h>
 
 #include "attachment.hpp"
-#include "hash.hpp"
+#include <mw/crypto.hpp>
 
 namespace {
 
@@ -39,7 +39,7 @@ Attachment AttachmentManager::attachmentFromBytes(
     std::string_view content_type) const
 {
     Attachment att;
-    att.hash = hasher.hashToHexStr(bytes);
+    att.hash = hasher.hashToHexStr(bytes).value();
     if(!content_type.empty())
     {
         att.content_type = content_type;

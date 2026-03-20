@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "error.hpp"
+#include <mw/error.hpp>
 
 struct Theme
 {
@@ -22,7 +22,7 @@ struct Theme
 class ThemeManager
 {
 public:
-    E<void> loadDir(const std::filesystem::path& dir);
+    mw::E<void> loadDir(const std::filesystem::path& dir);
 
     // Return all the stylesheets required for the specified theme,
     // including the stylesheets from the parents up to a root theme.

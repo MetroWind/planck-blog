@@ -12,24 +12,24 @@
 #include <inja.hpp>
 
 #include "attachment.hpp"
-#include "auth.hpp"
+#include <mw/auth.hpp>
 #include "config.hpp"
 #include "data.hpp"
-#include "hash.hpp"
-#include "http_client.hpp"
+#include <mw/crypto.hpp>
+#include <mw/http_client.hpp>
 #include "post_rendering.hpp"
 #include "theme.hpp"
-#include "url.hpp"
-#include "utils.hpp"
+#include <mw/url.hpp>
+#include <mw/utils.hpp>
 
-void copyToHttplibReq(const HTTPRequest& src, httplib::Request& dest);
+void copyToHttplibReq(const mw::HTTPRequest& src, httplib::Request& dest);
 
 class App
 {
 public:
     App() = delete;
     App(const Configuration& conf,
-        std::unique_ptr<AuthInterface> openid_auth,
+        std::unique_ptr<mw::AuthInterface> openid_auth,
         std::unique_ptr<DataSourceInterface> data_source);
 
     std::string urlFor(const std::string& name, const std::string& arg="") const;
@@ -68,15 +68,15 @@ private:
     struct SessionValidation
     {
         enum { VALID, REFRESHED, INVALID } status;
-        UserInfo user;
-        Tokens new_tokens;
+        mw::UserInfo user;
+        mw::Tokens new_tokens;
 
-        static SessionValidation valid(UserInfo&& user_info)
+        static SessionValidation valid(mw::UserInfo&& user_info)
         {
             return {VALID, user_info, {}};
         }
 
-        static SessionValidation refreshed(UserInfo&& user_info, Tokens&& tokens)
+        static SessionValidation refreshed(mw::UserInfo&& user_info, mw::Tokens&& tokens)
         {
             return {REFRESHED, user_info, tokens};
         }
@@ -86,7 +86,7 @@ private:
             return {INVALID, {}, {}};
         }
     };
-    E<SessionValidation> validateSession(const httplib::Request& req) const;
+    mw::E<SessionValidation> validateSession(const httplib::Request& req) const;
 
     // Query the auth module for the status of the session. If there
     // is no session or it fails to query the auth module, set the
@@ -100,19 +100,19 @@ private:
         bool allow_error_and_invalid=false) const;
 
     nlohmann::json postToJson(const Post& p) const;
-    E<nlohmann::json> renderPostToJson(Post&& p, bool use_cache=true);
+    mw::E<nlohmann::json> renderPostToJson(Post&& p, bool use_cache=true);
 
     // This gives a path, optionally with the name of an argument,
-    // that is suitable to bind to a URL handler. For example,
-    // supposed the URL of the blog post with ID 1 is
+    // that is suitable to bind to a mw::URL handler. For example,
+    // supposed the mw::URL of the blog post with ID 1 is
     // “http://some.domain/blog/p/1”. Calling “getPath("post", "id")”
     // would give “/blog/p/:id”. This uses urlFor(), and therefore
-    // requires that the URL is mapped correctly in that function.
+    // requires that the mw::URL is mapped correctly in that function.
     std::string getPath(const std::string& name, const std::string& arg_name="")
         const;
 
     // Convert HTML form data to post.
-    E<Post> formToPost(const httplib::Request& req, std::string_view author)
+    mw::E<Post> formToPost(const httplib::Request& req, std::string_view author)
         const;
 
     void setup();
@@ -120,13 +120,13 @@ private:
 
     const Configuration config;
     inja::Environment templates;
-    std::unique_ptr<AuthInterface> auth;
+    std::unique_ptr<mw::AuthInterface> auth;
     std::unique_ptr<DataSourceInterface> data;
-    std::unique_ptr<HasherInterface> hasher;
+    std::unique_ptr<mw::HasherInterface> hasher;
     AttachmentManager attachment_manager;
     PostCache post_cache;
     ThemeManager theme_manager;
-    URL base_url;
+    mw::URL base_url;
     nlohmann::json static_template_data;
     std::atomic<bool> should_stop;
     std::thread server_thread;

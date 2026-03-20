@@ -4,8 +4,8 @@
 #include <string>
 #include <string_view>
 
-#include "error.hpp"
-#include "utils.hpp"
+#include <mw/error.hpp>
+#include <mw/utils.hpp>
 
 class Post
 {
@@ -22,8 +22,8 @@ public:
     std::string abstract;
     std::string raw_content;
     // Drafts do not have publish time.
-    std::optional<Time> publish_time;
-    std::optional<Time> update_time;
+    std::optional<mw::Time> publish_time;
+    std::optional<mw::Time> update_time;
     // The IETF BCP 47 language tag (RFC 5646) of the post.
     std::string language;
     std::string author;

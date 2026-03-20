@@ -3,21 +3,21 @@
 #include <string>
 
 #include "config.hpp"
-#include "utils.hpp"
-#include "hash.hpp"
+#include <mw/utils.hpp>
+#include <mw/crypto.hpp>
 
 struct Attachment
 {
     std::string original_name;
     std::string hash;
-    Time upload_time;
+    mw::Time upload_time;
     std::string content_type;
 };
 
 class AttachmentManager
 {
 public:
-    explicit AttachmentManager(HasherInterface& h): hasher(h) {}
+    explicit AttachmentManager(mw::HasherInterface& h): hasher(h) {}
 
     // Get an attachment object out of some bytes.
     Attachment attachmentFromBytes(const std::string& bytes,
@@ -28,5 +28,5 @@ public:
     std::string path(const Attachment& att) const;
 
 private:
-    HasherInterface& hasher;
+    mw::HasherInterface& hasher;
 };

@@ -5,12 +5,12 @@
 
 #include "config.hpp"
 #include "post.hpp"
-#include "error.hpp"
+#include <mw/error.hpp>
 
 // Render a post to bare HTML (HTML that only contains the post
 // itself). This does not do template substitution to the content of
 // the post.
-E<std::string> renderPost(const Post& p, const Configuration& conf);
+mw::E<std::string> renderPost(const Post& p, const Configuration& conf);
 
 // TODO: thread-safty
 //
@@ -29,10 +29,10 @@ public:
     struct TimedRender
     {
         std::string html;
-        Time render_time;
+        mw::Time render_time;
     };
 
-    E<std::string> renderPost(const Post& p);
+    mw::E<std::string> renderPost(const Post& p);
 
 private:
     std::unordered_map<int64_t, TimedRender> cache;

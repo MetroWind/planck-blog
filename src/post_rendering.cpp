@@ -4,38 +4,39 @@
 
 #include <cmark.h>
 
-#include "exec.hpp"
+#include <unistd.h>
+#include <mw/exec.hpp>
 #include "post_rendering.hpp"
-#include "utils.hpp"
-#include "error.hpp"
+#include <mw/utils.hpp>
+#include <mw/error.hpp>
 #include "config.hpp"
 
 namespace
 {
 
-E<std::string> renderMarkdown(const std::string& src)
+mw::E<std::string> renderMarkdown(const std::string& src)
 {
     char* html = cmark_markdown_to_html(src.data(), src.size(),
                                         CMARK_OPT_DEFAULT);
     if(html == nullptr)
     {
-        return std::unexpected(runtimeError("Failed to render Markdown."));
+        return std::unexpected(mw::runtimeError("Failed to render Markdown."));
     }
     std::string result = html;
     free(html);
     return result;
 }
 
-E<std::string> renderAsciiDoc(const std::string& src)
+mw::E<std::string> renderAsciiDoc(const std::string& src)
 {
     std::string output;
-    ASSIGN_OR_RETURN(Process proc, Process::exec(
+    ASSIGN_OR_RETURN(mw::Process proc, mw::Process::exec(
         src, {"asciidoctor", "-a", "stylesheet!", "-s", "-o", "-", "-"},
         &output));
     ASSIGN_OR_RETURN(int status, proc.wait());
     if(status != 0)
     {
-        return std::unexpected(runtimeError(std::format(
+        return std::unexpected(mw::runtimeError(std::format(
             "AsciiDoctor failed with code {}", status)));
     }
     return output;
@@ -43,7 +44,7 @@ E<std::string> renderAsciiDoc(const std::string& src)
 
 } // namespace
 
-E<std::string> renderPost(const Post& p, [[maybe_unused]] const Configuration& conf)
+mw::E<std::string> renderPost(const Post& p, [[maybe_unused]] const Configuration& conf)
 {
     switch(p.markup)
     {
@@ -55,7 +56,7 @@ E<std::string> renderPost(const Post& p, [[maybe_unused]] const Configuration& c
     std::unreachable();
 }
 
-E<std::string> PostCache::renderPost(const Post& p)
+mw::E<std::string> PostCache::renderPost(const Post& p)
 {
     // If a post doesn’t have ID, it’s probably not in the DB yet.
     // Don’t bother to cache it.
@@ -73,12 +74,12 @@ E<std::string> PostCache::renderPost(const Post& p)
     if(it == cache.end())
     {
         ASSIGN_OR_RETURN(std::string rendered, ::renderPost(p, conf));
-        cache[*p.id] = {rendered, Clock::now()};
+        cache[*p.id] = {rendered, mw::Clock::now()};
         return rendered;
     }
 
     TimedRender& cached_render = it->second;
-    Time post_time = *p.publish_time;
+    mw::Time post_time = *p.publish_time;
     if(p.update_time.has_value())
     {
         post_time = *p.update_time;
@@ -91,7 +92,7 @@ E<std::string> PostCache::renderPost(const Post& p)
     else
     {
         ASSIGN_OR_RETURN(std::string rendered, ::renderPost(p, conf));
-        cache[*p.id] = {rendered, Clock::now()};
+        cache[*p.id] = {rendered, mw::Clock::now()};
         return rendered;
     }
 }

@@ -8,11 +8,11 @@
 #include <ryml_std.hpp>
 
 #include "config.hpp"
-#include "error.hpp"
+#include <mw/error.hpp>
 
 namespace {
 
-E<std::vector<char>> readFile(const std::filesystem::path& path)
+mw::E<std::vector<char>> readFile(const std::filesystem::path& path)
 {
     std::ifstream f(path, std::ios::binary);
     std::vector<char> content;
@@ -21,7 +21,7 @@ E<std::vector<char>> readFile(const std::filesystem::path& path)
                    std::istreambuf_iterator<char>());
     if(f.bad() || f.fail())
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             std::format("Failed to read file {}", path.string())));
     }
 
@@ -38,7 +38,7 @@ bool getYamlValue(ryml::ConstNodeRef node, T& result)
 
 } // namespace
 
-E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
+mw::E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
 {
     auto buffer = readFile(path);
     if(!buffer.has_value())
@@ -64,7 +64,7 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     {
         if(!getYamlValue(tree["listen-port"], config.listen_port))
         {
-            return std::unexpected(runtimeError("Invalid port"));
+            return std::unexpected(mw::runtimeError("Invalid port"));
         }
     }
     if(tree["client-id"].readable())
@@ -112,5 +112,5 @@ E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
         }
     }
 
-    return E<Configuration>{std::in_place, std::move(config)};
+    return mw::E<Configuration>{std::in_place, std::move(config)};
 }

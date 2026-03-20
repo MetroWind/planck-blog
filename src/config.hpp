@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <unordered_map>
 
-#include "error.hpp"
+#include <mw/error.hpp>
 
 struct Substitutions
 {
@@ -34,6 +34,6 @@ struct Configuration
     StringMap vars;
     StringMap custom_vars;
 
-    static E<Configuration> fromYaml(const std::filesystem::path& path);
+    static mw::E<Configuration> fromYaml(const std::filesystem::path& path);
 
 };

@@ -1,3 +1,4 @@
+#include "json_utils.hpp"
 #include <memory>
 #include <variant>
 #include <filesystem>
@@ -6,15 +7,15 @@
 #include <spdlog/spdlog.h>
 
 #include "app.hpp"
-#include "auth.hpp"
+#include <mw/auth.hpp>
 #include "config.hpp"
 #include "data.hpp"
-#include "http_client.hpp"
+#include <mw/http_client.hpp>
 #include "legacy-migration.hpp"
 #include "spdlog/common.h"
 #include "spdlog/spdlog.h"
-#include "utils.hpp"
-#include "url.hpp"
+#include <mw/utils.hpp>
+#include <mw/url.hpp>
 
 int main(int argc, char** argv)
 {
@@ -79,7 +80,7 @@ int main(int argc, char** argv)
                           errorMsg(data_source.error()));
             return 2;
         }
-        E<void> ok_maybe = (*data_source)->deletePost(id);
+        mw::E<void> ok_maybe = (*data_source)->deletePost(id);
         if(ok_maybe)
         {
             return 0;
@@ -102,7 +103,7 @@ int main(int argc, char** argv)
                           errorMsg(data_source.error()));
             return 2;
         }
-        E<void> ok_maybe = (*data_source)->deleteAttachment(std::move(hash));
+        mw::E<void> ok_maybe = (*data_source)->deleteAttachment(std::move(hash));
         if(ok_maybe)
         {
             return 0;
@@ -119,13 +120,13 @@ int main(int argc, char** argv)
         std::string _ = opts["set"].as<std::string>();
         std::string_view keyvalue(_);
         auto index = keyvalue.find('=');
-        std::string_view key = strip(keyvalue.substr(0, index));
+        std::string_view key = mw::strip(keyvalue.substr(0, index));
         if(key.empty())
         {
             spdlog::error("Invalid key");
             return 1;
         }
-        nlohmann::json value = parseJSON(strip(keyvalue.substr(index+1)));
+        nlohmann::json value = parseJSON(mw::strip(keyvalue.substr(index+1)));
         if(value.is_discarded())
         {
             spdlog::error("Invalid value");
@@ -152,16 +153,17 @@ int main(int argc, char** argv)
         }
     }
 
-    auto url_prefix = URL::fromStr(conf->base_url);
+    auto url_prefix = mw::URL::fromStr(conf->base_url);
     if(!url_prefix.has_value())
     {
-        spdlog::error("Invalid base URL: {}", conf->base_url);
+        spdlog::error("Invalid base mw::URL: {}", conf->base_url);
         return 4;
     }
 
-    auto auth = AuthOpenIDConnect::create(
-        *conf, url_prefix->appendPath("openid-redirect").str(),
-        std::make_unique<HTTPSession>());
+    auto auth = mw::AuthOpenIDConnect::create(
+        conf->openid_url_prefix, conf->client_id, conf->client_secret,
+        url_prefix->appendPath("openid-redirect").str(),
+        std::make_unique<mw::HTTPSession>());
     if(!auth.has_value())
     {
         spdlog::error("Failed to create authentication module: {}",

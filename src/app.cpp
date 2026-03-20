@@ -1,3 +1,4 @@
+#include "json_utils.hpp"
 #define CPPHTTPLIB_FORM_URL_ENCODED_PAYLOAD_MAX_LENGTH 131072
 
 #include <algorithm>
@@ -23,23 +24,23 @@
 
 #include "app.hpp"
 #include "attachment.hpp"
-#include "auth.hpp"
+#include <mw/auth.hpp>
 #include "config.hpp"
-#include "error.hpp"
-#include "hash.hpp"
-#include "http_client.hpp"
+#include <mw/error.hpp>
+#include <mw/crypto.hpp>
+#include <mw/http_client.hpp>
 #include "post.hpp"
 #include "theme.hpp"
-#include "url.hpp"
-#include "utils.hpp"
+#include <mw/url.hpp>
+#include <mw/utils.hpp>
 
 #define _ASSIGN_OR_RESPOND_ERROR(tmp, var, val, res)                    \
     auto tmp = val;                                                     \
     if(!tmp.has_value())                                                \
     {                                                                   \
-        if(std::holds_alternative<HTTPError>(tmp.error()))              \
+        if(std::holds_alternative<mw::HTTPError>(tmp.error()))              \
         {                                                               \
-            const HTTPError& e = std::get<HTTPError>(tmp.error());      \
+            const mw::HTTPError& e = std::get<mw::HTTPError>(tmp.error());      \
             res.status = e.code;                                        \
             res.set_content(e.msg, "text/plain");                       \
             return;                                                     \
@@ -101,18 +102,18 @@ std::unordered_map<std::string, std::string> parseCookies(std::string_view value
     return cookies;
 }
 
-void setTokenCookies(const Tokens& tokens, httplib::Response& res)
+void setTokenCookies(const mw::Tokens& tokens, httplib::Response& res)
 {
     int64_t expire_sec = 300;
     if(tokens.expiration.has_value())
     {
         auto expire = std::chrono::duration_cast<std::chrono::seconds>(
-            *tokens.expiration - Clock::now());
+            *tokens.expiration - mw::Clock::now());
         expire_sec = expire.count();
     }
     res.set_header("Set-Cookie", std::format(
                        "planck-blog-access-token={}; Max-Age={}",
-                       urlEncode(tokens.access_token), expire_sec));
+                       mw::urlEncode(tokens.access_token), expire_sec));
     // Add refresh token to cookie, with one month expiration.
     if(tokens.refresh_token.has_value())
     {
@@ -120,21 +121,21 @@ void setTokenCookies(const Tokens& tokens, httplib::Response& res)
         if(tokens.refresh_expiration.has_value())
         {
             auto expire = std::chrono::duration_cast<std::chrono::seconds>(
-                *tokens.refresh_expiration - Clock::now());
+                *tokens.refresh_expiration - mw::Clock::now());
             expire_sec = expire.count();
         }
 
         res.set_header("Set-Cookie", std::format(
                            "planck-blog-refresh-token={}; Max-Age={}",
-                           urlEncode(*tokens.refresh_token), expire_sec));
+                           mw::urlEncode(*tokens.refresh_token), expire_sec));
     }
 }
 
-E<nlohmann::json> postExcerptToJson(const Post& p)
+mw::E<nlohmann::json> postExcerptToJson(const Post& p)
 {
     if(!p.id.has_value())
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Only post with an ID can be listed"));
     }
 
@@ -149,7 +150,7 @@ E<nlohmann::json> postExcerptToJson(const Post& p)
 
 } // namespace
 
-void copyToHttplibReq(const HTTPRequest& src, httplib::Request& dest)
+void copyToHttplibReq(const mw::HTTPRequest& src, httplib::Request& dest)
 {
     std::string type = "text/plain";
     if(auto it = src.header.find("Content-Type");
@@ -168,7 +169,7 @@ void copyToHttplibReq(const HTTPRequest& src, httplib::Request& dest)
     }
 }
 
-E<App::SessionValidation> App::validateSession(const httplib::Request& req) const
+mw::E<App::SessionValidation> App::validateSession(const httplib::Request& req) const
 {
     if(!req.has_header("Cookie"))
     {
@@ -181,9 +182,9 @@ E<App::SessionValidation> App::validateSession(const httplib::Request& req) cons
        it != std::end(cookies))
     {
         spdlog::debug("Cookie has access token.");
-        Tokens tokens;
+        mw::Tokens tokens;
         tokens.access_token = it->second;
-        E<UserInfo> user = auth->getUser(tokens);
+        mw::E<mw::UserInfo> user = auth->getUser(tokens);
         if(user.has_value())
         {
             return SessionValidation::valid(*std::move(user));
@@ -195,8 +196,8 @@ E<App::SessionValidation> App::validateSession(const httplib::Request& req) cons
     {
         spdlog::debug("Cookie has refresh token.");
         // Try to refresh the tokens.
-        ASSIGN_OR_RETURN(Tokens tokens, auth->refreshTokens(it->second));
-        ASSIGN_OR_RETURN(UserInfo user, auth->getUser(tokens));
+        ASSIGN_OR_RETURN(mw::Tokens tokens, auth->refreshTokens(it->second));
+        ASSIGN_OR_RETURN(mw::UserInfo user, auth->getUser(tokens));
         return SessionValidation::refreshed(std::move(user), std::move(tokens));
     }
     return SessionValidation::invalid();
@@ -206,7 +207,7 @@ std::optional<App::SessionValidation> App::prepareSession(
     const httplib::Request& req, httplib::Response& res,
     bool allow_error_and_invalid) const
 {
-    E<SessionValidation> session = validateSession(req);
+    mw::E<SessionValidation> session = validateSession(req);
     if(!session.has_value())
     {
         if(allow_error_and_invalid)
@@ -243,21 +244,21 @@ std::optional<App::SessionValidation> App::prepareSession(
     return *session;
 }
 
-App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
+App::App(const Configuration& conf, std::unique_ptr<mw::AuthInterface> openid_auth,
          std::unique_ptr<DataSourceInterface> data_source)
         : config(conf),
           templates((std::filesystem::path(config.data_dir) / "templates" / "")
                     .string()),
           auth(std::move(openid_auth)),
           data(std::move(data_source)),
-          hasher(std::make_unique<Sha256HalfHasher>()),
+          hasher(std::make_unique<mw::SHA256HalfHasher>()),
           attachment_manager(*hasher),
           post_cache(conf),
           theme_manager(),
           base_url(),
           should_stop(false)
 {
-    auto u = URL::fromStr(conf.base_url);
+    auto u = mw::URL::fromStr(conf.base_url);
     if(u.has_value())
     {
         base_url = *std::move(u);
@@ -280,7 +281,7 @@ App::App(const Configuration& conf, std::unique_ptr<AuthInterface> openid_auth,
         }
     });
 
-    if(E<void> result = theme_manager.loadDir(
+    if(mw::E<void> result = theme_manager.loadDir(
            fs::path(config.data_dir) / "themes");
        !result)
     {
@@ -300,33 +301,33 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     }
     if(name == "openid-redirect")
     {
-        return URL(base_url).appendPath("openid-redirect").str();
+        return mw::URL(base_url).appendPath("openid-redirect").str();
     }
     if(name == "statics")
     {
-        return URL(base_url).appendPath("statics").appendPath(arg).str();
+        return mw::URL(base_url).appendPath("statics").appendPath(arg).str();
     }
     if(name == "stylesheet")
     {
-        return URL(base_url).appendPath("themes").appendPath(arg).str();
+        return mw::URL(base_url).appendPath("themes").appendPath(arg).str();
     }
     if(name == "login")
     {
-        return URL(base_url).appendPath("login").str();
+        return mw::URL(base_url).appendPath("login").str();
     }
     if(name == "post")
     {
-        return URL(base_url).appendPath("p").appendPath(arg).str();
+        return mw::URL(base_url).appendPath("p").appendPath(arg).str();
     }
     if(name == "drafts")
     {
-        return URL(base_url).appendPath("drafts").str();
+        return mw::URL(base_url).appendPath("drafts").str();
     }
     if(name == "attachment")
     {
         if(arg.contains('/'))
         {
-            return URL(base_url).appendPath("attachment").appendPath(arg).str();
+            return mw::URL(base_url).appendPath("attachment").appendPath(arg).str();
         }
         else
         {
@@ -335,9 +336,9 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
             {
                 if(att_maybe->has_value())
                 {
-                    return URL(base_url).appendPath("attachment")
+                    return mw::URL(base_url).appendPath("attachment")
                         .appendPath(arg).appendPath(
-                            URL::encode((*att_maybe)->original_name))
+                            mw::URL::encode((*att_maybe)->original_name))
                         .str();
                 }
             }
@@ -346,44 +347,44 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     }
     if(name == "attachments")
     {
-        return URL(base_url).appendPath("attachments").str();
+        return mw::URL(base_url).appendPath("attachments").str();
     }
     if(name == "create-post")
     {
-        return URL(base_url).appendPath("create-post").str();
+        return mw::URL(base_url).appendPath("create-post").str();
     }
     if(name == "edit-post")
     {
-        return URL(base_url).appendPath("edit-post").appendPath(arg).str();
+        return mw::URL(base_url).appendPath("edit-post").appendPath(arg).str();
     }
     if(name == "edit-draft")
     {
-        return URL(base_url).appendPath("edit-draft").appendPath(arg).str();
+        return mw::URL(base_url).appendPath("edit-draft").appendPath(arg).str();
     }
     // POST endpoints
     if(name == "save-draft")
     {
-        return URL(base_url).appendPath("save-draft").str();
+        return mw::URL(base_url).appendPath("save-draft").str();
     }
     if(name == "save-post")
     {
-        return URL(base_url).appendPath("save-post").str();
+        return mw::URL(base_url).appendPath("save-post").str();
     }
     if(name == "publish-from-draft")
     {
-        return URL(base_url).appendPath("publish-from-new-draft").str();
+        return mw::URL(base_url).appendPath("publish-from-new-draft").str();
     }
     if(name == "upload-attachment")
     {
-        return URL(base_url).appendPath("upload-attachment").str();
+        return mw::URL(base_url).appendPath("upload-attachment").str();
     }
     if(name == "select-theme")
     {
-        return URL(base_url).appendPath("select-theme").str();
+        return mw::URL(base_url).appendPath("select-theme").str();
     }
     if(name == "feed")
     {
-        return URL(base_url).appendPath("feed.xml").str();
+        return mw::URL(base_url).appendPath("feed.xml").str();
     }
     return "";
 }
@@ -437,8 +438,8 @@ void App::handleOpenIDRedirect(const httplib::Request& req,
 
     std::string code = req.get_param_value("code");
     spdlog::debug("OpenID server visited {} with code {}.", req.path, code);
-    ASSIGN_OR_RESPOND_ERROR(Tokens tokens, auth->authenticate(code), res);
-    ASSIGN_OR_RESPOND_ERROR(UserInfo user, auth->getUser(tokens), res);
+    ASSIGN_OR_RESPOND_ERROR(mw::Tokens tokens, auth->authenticate(code), res);
+    ASSIGN_OR_RESPOND_ERROR(mw::UserInfo user, auth->getUser(tokens), res);
 
     setTokenCookies(tokens, res);
     res.set_redirect(urlFor("index"), 301);
@@ -447,10 +448,10 @@ void App::handleOpenIDRedirect(const httplib::Request& req,
 void App::handlePost(const httplib::Request& req, httplib::Response& res)
 {
     ASSIGN_OR_RESPOND_ERROR(
-        int64_t id, strToNumber<int64_t>(req.path_params.at("id")).or_else(
-            []([[maybe_unused]] auto _) -> E<int64_t>
+        int64_t id, mw::strToNumber<int64_t>(req.path_params.at("id")).or_else(
+            []([[maybe_unused]] auto _) -> mw::E<int64_t>
             {
-                return std::unexpected(httpError(401, "Invalid post ID"));
+                return std::unexpected(mw::httpError(401, "Invalid post ID"));
             }), res);
 
     auto session = prepareSession(req, res, true);
@@ -540,10 +541,10 @@ void App::handleEditDraftFrontEnd(const httplib::Request& req,
                                   httplib::Response& res)
 {
     ASSIGN_OR_RESPOND_ERROR(
-        int64_t id, strToNumber<int64_t>(req.path_params.at("id")).or_else(
-            []([[maybe_unused]] auto _) -> E<int64_t>
+        int64_t id, mw::strToNumber<int64_t>(req.path_params.at("id")).or_else(
+            []([[maybe_unused]] auto _) -> mw::E<int64_t>
             {
-                return std::unexpected(httpError(401, "Invalid post ID"));
+                return std::unexpected(mw::httpError(401, "Invalid post ID"));
             }), res);
 
     auto session = prepareSession(req, res);
@@ -575,10 +576,10 @@ void App::handleEditPostFrontEnd(const httplib::Request& req,
                                  httplib::Response& res)
 {
     ASSIGN_OR_RESPOND_ERROR(
-        int64_t id, strToNumber<int64_t>(req.path_params.at("id")).or_else(
-            []([[maybe_unused]] auto _) -> E<int64_t>
+        int64_t id, mw::strToNumber<int64_t>(req.path_params.at("id")).or_else(
+            []([[maybe_unused]] auto _) -> mw::E<int64_t>
             {
-                return std::unexpected(httpError(401, "Invalid post ID"));
+                return std::unexpected(mw::httpError(401, "Invalid post ID"));
             }), res);
 
     auto session = prepareSession(req, res);
@@ -620,7 +621,7 @@ void App::handleSavePost(const httplib::Request& req, httplib::Response& res)
         return;
     }
 
-    E<nlohmann::json> value = data->getValueWithDefault(
+    mw::E<nlohmann::json> value = data->getValueWithDefault(
         "pause-update-time", false);
     if(!value.has_value())
     {
@@ -628,7 +629,7 @@ void App::handleSavePost(const httplib::Request& req, httplib::Response& res)
         res.set_content(errorMsg(value.error()), "text/plain");
         return;
     }
-    E<void> maybe_error;
+    mw::E<void> maybe_error;
     if(value->get<bool>())
     {
         maybe_error = data->updatePostNoUpdateTime(p);
@@ -696,9 +697,9 @@ void App::handleAttachments(const httplib::Request& req, httplib::Response& res)
         atts_json.push_back({
                 { "original_name", att.original_name },
                 { "hash", att.hash },
-                { "upload_time", timeToSeconds(att.upload_time) },
-                { "upload_time_str", timeToStr(att.upload_time) },
-                { "upload_time_iso8601", timeToISO8601(att.upload_time) },
+                { "upload_time", mw::timeToSeconds(att.upload_time) },
+                { "upload_time_str", mw::timeToStr(att.upload_time) },
+                { "upload_time_iso8601", mw::timeToISO8601(att.upload_time) },
                 { "content_type", att.content_type },
                 { "url", urlFor("attachment",
                                 att.hash + "/" + att.original_name) }
@@ -784,7 +785,7 @@ void App::handleAttachmentUpload(const httplib::Request& req,
         return;
     }
     att_file.close();
-    E<void> error_maybe = data->addAttachment(std::move(att));
+    mw::E<void> error_maybe = data->addAttachment(std::move(att));
     if(!error_maybe)
     {
         fs::remove(path);
@@ -827,14 +828,14 @@ void App::handleFeed(const httplib::Request& req, httplib::Response& res)
     {
         ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj,
                                 renderPostToJson(std::move(p)), res);
-        pj["content"] = escapeHTML(pj["content"].get_ref<std::string&>());
+        pj["content"] = mw::escapeHTML(pj["content"].get_ref<std::string&>());
         posts_json.push_back(std::move(pj));
     }
-    ASSIGN_OR_RESPOND_ERROR(Time latest_update, data->getLatestUpdateTime(),
+    ASSIGN_OR_RESPOND_ERROR(mw::Time latest_update, data->getLatestUpdateTime(),
                             res);
     nlohmann::json data = baseTemplateData(req);
     data.merge_patch({{"posts", std::move(posts_json)},
-                      {"latest_update_time", timeToISO8601(latest_update)}});
+                      {"latest_update_time", mw::timeToISO8601(latest_update)}});
     std::string result = templates.render_file(
         "feed.xml", std::move(data));
     res.status = 200;
@@ -852,14 +853,14 @@ nlohmann::json App::postToJson(const Post& p) const
     result["title"] = p.title;
     result["abstract"] = p.abstract;
     result["content"] = p.raw_content;
-    const Time APOCH = secondsToTime(0);
-    Time publish_time = APOCH;
+    const mw::Time APOCH = mw::secondsToTime(0);
+    mw::Time publish_time = APOCH;
     if(p.publish_time.has_value())
     {
         publish_time = *p.publish_time;
-        result["publish_time"] = timeToSeconds(publish_time);
-        result["publish_time_str"] = timeToStr(*p.publish_time);
-        result["publish_time_iso8601"] = timeToISO8601(*p.publish_time);
+        result["publish_time"] = mw::timeToSeconds(publish_time);
+        result["publish_time_str"] = mw::timeToStr(*p.publish_time);
+        result["publish_time_iso8601"] = mw::timeToISO8601(*p.publish_time);
     }
     else
     {
@@ -868,13 +869,13 @@ nlohmann::json App::postToJson(const Post& p) const
         result["publish_time_iso8601"] = "";
     }
 
-    Time update_time = APOCH;
+    mw::Time update_time = APOCH;
     if(p.update_time.has_value())
     {
         update_time = *p.update_time;
-        result["update_time"] = timeToSeconds(update_time);
-        result["update_time_str"] = timeToStr(*p.update_time);
-        result["update_time_iso8601"] = timeToISO8601(*p.update_time);
+        result["update_time"] = mw::timeToSeconds(update_time);
+        result["update_time_str"] = mw::timeToStr(*p.update_time);
+        result["update_time_iso8601"] = mw::timeToISO8601(*p.update_time);
     }
     else
     {
@@ -883,12 +884,12 @@ nlohmann::json App::postToJson(const Post& p) const
         result["update_time_iso8601"] = "";
     }
 
-    const Time& change_time = std::max(update_time, publish_time);
+    const mw::Time& change_time = std::max(update_time, publish_time);
     if(change_time > APOCH)
     {
-        result["change_time"] = timeToSeconds(change_time);
-        result["change_time_str"] = timeToStr(change_time);
-        result["change_time_iso8601"] = timeToISO8601(change_time);
+        result["change_time"] = mw::timeToSeconds(change_time);
+        result["change_time_str"] = mw::timeToStr(change_time);
+        result["change_time_iso8601"] = mw::timeToISO8601(change_time);
     }
     else
     {
@@ -903,7 +904,7 @@ nlohmann::json App::postToJson(const Post& p) const
     return result;
 }
 
-E<nlohmann::json> App::renderPostToJson(Post&& p, bool use_cache)
+mw::E<nlohmann::json> App::renderPostToJson(Post&& p, bool use_cache)
 {
     nlohmann::json result = postToJson(p);
     // Do template substitution in the post content. This allows
@@ -935,11 +936,11 @@ E<nlohmann::json> App::renderPostToJson(Post&& p, bool use_cache)
 std::string App::getPath(const std::string& name,
                          const std::string& arg_name) const
 {
-    return URL::fromStr(urlFor(name, std::string(":") + arg_name)).value()
+    return mw::URL::fromStr(urlFor(name, std::string(":") + arg_name)).value()
         .path();
 }
 
-E<Post> App::formToPost(const httplib::Request& req, std::string_view author) const
+mw::E<Post> App::formToPost(const httplib::Request& req, std::string_view author) const
 {
     Post draft;
     if(auto m = Post::markupFromStr(req.get_param_value("markup"));
@@ -949,16 +950,16 @@ E<Post> App::formToPost(const httplib::Request& req, std::string_view author) co
     }
     else
     {
-        return std::unexpected(httpError(400, "Invalid markup"));
+        return std::unexpected(mw::httpError(400, "Invalid markup"));
     }
     if(req.has_param("id"))
     {
         ASSIGN_OR_RETURN(
-            draft.id, strToNumber<int64_t>(req.get_param_value("id")));
+            draft.id, mw::strToNumber<int64_t>(req.get_param_value("id")));
     }
     draft.title = req.get_param_value("title");
-    draft.abstract = strip(req.get_param_value("abstract"));
-    draft.raw_content = strip(req.get_param_value("content"));
+    draft.abstract = mw::strip(req.get_param_value("abstract"));
+    draft.raw_content = mw::strip(req.get_param_value("content"));
     draft.language = req.get_param_value("language");
     draft.author = author;
     return draft;
@@ -971,7 +972,7 @@ void App::setup()
                                    "statics").string();
         spdlog::info("Mounting static dir at {}...", statics_dir);
         auto ret = server.set_mount_point(
-            URL(base_url).appendPath("statics").path(), statics_dir);
+            mw::URL(base_url).appendPath("statics").path(), statics_dir);
         if (!ret)
         {
             spdlog::error("Failed to mount statics");
@@ -983,7 +984,7 @@ void App::setup()
                                  "themes").string();
         spdlog::info("Mounting themes dir at {}...", themes_dir);
         auto ret = server.set_mount_point(
-            URL(base_url).appendPath("themes").path(), themes_dir);
+            mw::URL(base_url).appendPath("themes").path(), themes_dir);
         if (!ret)
         {
             spdlog::error("Failed to mount themes");

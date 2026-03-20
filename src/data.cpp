@@ -1,3 +1,4 @@
+#include "json_utils.hpp"
 #include <exception>
 #include <iterator>
 #include <pthread.h>
@@ -15,20 +16,20 @@
 
 #include "attachment.hpp"
 #include "data.hpp"
-#include "database.hpp"
-#include "error.hpp"
-#include "utils.hpp"
+#include <mw/database.hpp>
+#include <mw/error.hpp>
+#include <mw/utils.hpp>
 #include "post.hpp"
 
 namespace {
-E<Post> postFromRow(const std::tuple<int, int, std::string, std::string,
+mw::E<Post> postFromRow(const std::tuple<int, int, std::string, std::string,
                     std::string, int64_t, int64_t, std::string, std::string>&
                     row)
 {
     int markup = std::get<1>(row);
     if(!Post::isValidMarkupInt(markup))
     {
-        return std::unexpected(runtimeError(std::format(
+        return std::unexpected(mw::runtimeError(std::format(
             "Invalid markup: {}", markup)));
     }
     Post p;
@@ -40,12 +41,12 @@ E<Post> postFromRow(const std::tuple<int, int, std::string, std::string,
     int64_t ptime = std::get<5>(row);
     if(ptime != 0)
     {
-        p.publish_time = secondsToTime(ptime);
+        p.publish_time = mw::secondsToTime(ptime);
     }
     int64_t utime = std::get<6>(row);
     if(utime != 0)
     {
-        p.update_time = secondsToTime(utime);
+        p.update_time = mw::secondsToTime(utime);
     }
     p.language = std::move(std::get<7>(row));
     p.author = std::move(std::get<8>(row));
@@ -54,7 +55,7 @@ E<Post> postFromRow(const std::tuple<int, int, std::string, std::string,
 
 } // namespace
 
-E<nlohmann::json> DataSourceInterface::getValueWithDefault(
+mw::E<nlohmann::json> DataSourceInterface::getValueWithDefault(
         const std::string& key, nlohmann::json&& default_value) const
 {
     ASSIGN_OR_RETURN(std::optional<nlohmann::json> v, this->getValue(key));
@@ -68,11 +69,11 @@ E<nlohmann::json> DataSourceInterface::getValueWithDefault(
     }
 }
 
-E<std::unique_ptr<DataSourceSqlite>>
+mw::E<std::unique_ptr<DataSourceSqlite>>
 DataSourceSqlite::fromFile(const std::string& db_file)
 {
     auto data_source = std::make_unique<DataSourceSqlite>();
-    ASSIGN_OR_RETURN(data_source->db, SQLite::connectFile(db_file));
+    ASSIGN_OR_RETURN(data_source->db, mw::SQLite::connectFile(db_file));
     DO_OR_RETURN(data_source->setSchemaVersion(1));
     DO_OR_RETURN(data_source->db->execute(
         "CREATE TABLE IF NOT EXISTS Posts "
@@ -94,29 +95,29 @@ DataSourceSqlite::fromFile(const std::string& db_file)
     return data_source;
 }
 
-E<std::unique_ptr<DataSourceSqlite>> DataSourceSqlite::newFromMemory()
+mw::E<std::unique_ptr<DataSourceSqlite>> DataSourceSqlite::newFromMemory()
 {
     return fromFile(":memory:");
 }
 
-E<int64_t> DataSourceSqlite::getSchemaVersion() const
+mw::E<int64_t> DataSourceSqlite::getSchemaVersion() const
 {
     return db->evalToValue<int64_t>("PRAGMA user_version;");
 }
 
-E<std::vector<Post>> DataSourceSqlite::getPosts() const
+mw::E<std::vector<Post>> DataSourceSqlite::getPosts() const
 {
     return filterPosts("WHERE publish_time != 0 ORDER BY publish_time DESC");
 }
 
-E<std::vector<Post>> DataSourceSqlite::getPosts(int start, int count) const
+mw::E<std::vector<Post>> DataSourceSqlite::getPosts(int start, int count) const
 {
     return filterPosts(std::format(
         "WHERE publish_time != 0 ORDER BY publish_time DESC LIMIT {} OFFSET {}",
         count, start));
 }
 
-E<std::optional<Post>> DataSourceSqlite::getPost(int64_t id) const
+mw::E<std::optional<Post>> DataSourceSqlite::getPost(int64_t id) const
 {
     ASSIGN_OR_RETURN(std::vector<Post> ps, filterPosts(
         std::format("WHERE publish_time != 0 AND id = {}", id)));
@@ -126,13 +127,13 @@ E<std::optional<Post>> DataSourceSqlite::getPost(int64_t id) const
     }
     if(ps.size() > 1)
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Something weird happened; duplicated post ID???"));
     }
     return ps[0];
 }
 
-E<std::vector<Post>> DataSourceSqlite::getPostExcerpts() const
+mw::E<std::vector<Post>> DataSourceSqlite::getPostExcerpts() const
 {
     ASSIGN_OR_RETURN(
         auto rows, (db->eval<int64_t, std::string, std::string, std::string>(
@@ -153,11 +154,11 @@ E<std::vector<Post>> DataSourceSqlite::getPostExcerpts() const
     return posts;
 }
 
-E<void> DataSourceSqlite::updatePost(Post&& new_post) const
+mw::E<void> DataSourceSqlite::updatePost(Post&& new_post) const
 {
     if(!new_post.id.has_value())
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Trying to update a post without ID"));
     }
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
@@ -165,28 +166,28 @@ E<void> DataSourceSqlite::updatePost(Post&& new_post) const
         "update_time = ?, language = ? WHERE id = ?;"));
     DO_OR_RETURN(sql.bind(
         static_cast<int>(new_post.markup), new_post.title, new_post.abstract,
-        new_post.raw_content, timeToSeconds(Clock::now()), new_post.language,
+        new_post.raw_content, mw::timeToSeconds(mw::Clock::now()), new_post.language,
         *new_post.id));
     DO_OR_RETURN(db->execute(std::move(sql)));
     int64_t rows_count = db->changedRowsCount();
     if(rows_count == 0)
     {
-        return std::unexpected(runtimeError("Post not found"));
+        return std::unexpected(mw::runtimeError("Post not found"));
     }
     if(rows_count != 1)
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Something weird happened when updating the post. Behavior is "
             "undefined"));
     }
     return {};
 }
 
-E<void> DataSourceSqlite::updatePostNoUpdateTime(const Post& new_post) const
+mw::E<void> DataSourceSqlite::updatePostNoUpdateTime(const Post& new_post) const
 {
     if(!new_post.id.has_value())
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Trying to update a post without ID"));
     }
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
@@ -199,22 +200,22 @@ E<void> DataSourceSqlite::updatePostNoUpdateTime(const Post& new_post) const
     int64_t rows_count = db->changedRowsCount();
     if(rows_count == 0)
     {
-        return std::unexpected(runtimeError("Post not found"));
+        return std::unexpected(mw::runtimeError("Post not found"));
     }
     if(rows_count != 1)
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Something weird happened when updating the post. Behavior is "
             "undefined"));
     }
     return {};
 }
 
-E<int64_t> DataSourceSqlite::saveDraft(Post&& new_draft) const
+mw::E<int64_t> DataSourceSqlite::saveDraft(Post&& new_draft) const
 {
     if(new_draft.id.has_value())
     {
-        return std::unexpected(runtimeError("New draft should not have ID"));
+        return std::unexpected(mw::runtimeError("New draft should not have ID"));
     }
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
         "INSERT INTO Posts (markup, title, abstract, content, language, author)"
@@ -226,12 +227,12 @@ E<int64_t> DataSourceSqlite::saveDraft(Post&& new_draft) const
     return db->lastInsertRowID();
 }
 
-E<std::vector<Post>> DataSourceSqlite::getDrafts() const
+mw::E<std::vector<Post>> DataSourceSqlite::getDrafts() const
 {
     return filterPosts("WHERE publish_time = 0");
 }
 
-E<std::optional<Post>> DataSourceSqlite::getDraft(int64_t id) const
+mw::E<std::optional<Post>> DataSourceSqlite::getDraft(int64_t id) const
 {
     ASSIGN_OR_RETURN(std::vector<Post> ps, filterPosts(std::format(
         "WHERE publish_time = 0 AND id = {}", id)));
@@ -241,17 +242,17 @@ E<std::optional<Post>> DataSourceSqlite::getDraft(int64_t id) const
     }
     if(ps.size() > 1)
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Something weird happened; duplicated draft ID???"));
     }
     return ps[0];
 }
 
-E<void> DataSourceSqlite::editDraft(const Post& draft) const
+mw::E<void> DataSourceSqlite::editDraft(const Post& draft) const
 {
     if(!draft.id.has_value())
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Trying to edit a draft without ID"));
     }
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
@@ -265,37 +266,37 @@ E<void> DataSourceSqlite::editDraft(const Post& draft) const
     int64_t rows_count = db->changedRowsCount();
     if(rows_count == 0)
     {
-        return std::unexpected(runtimeError("Draft not found"));
+        return std::unexpected(mw::runtimeError("Draft not found"));
     }
     if(rows_count != 1)
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Something weird happened when editing the draft. Behavior is "
             "undefined"));
     }
     return {};
 }
 
-E<void> DataSourceSqlite::publishPost(int64_t id) const
+mw::E<void> DataSourceSqlite::publishPost(int64_t id) const
 {
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
         "UPDATE Posts SET publish_time = ? WHERE id = ? AND publish_time = 0;"));
-    DO_OR_RETURN(sql.bind(timeToSeconds(Clock::now()), id));
+    DO_OR_RETURN(sql.bind(mw::timeToSeconds(mw::Clock::now()), id));
     DO_OR_RETURN(db->execute(std::move(sql)));
     int64_t rows_count = db->changedRowsCount();
     if(rows_count == 0)
     {
-        return std::unexpected(runtimeError("Draft not found"));
+        return std::unexpected(mw::runtimeError("Draft not found"));
     }
     if(rows_count != 1)
     {
-        return std::unexpected(runtimeError(
+        return std::unexpected(mw::runtimeError(
             "Something weird happened when publishing. Behavior is undefined"));
     }
     return {};
 }
 
-E<void> DataSourceSqlite::deletePost(int64_t id) const
+mw::E<void> DataSourceSqlite::deletePost(int64_t id) const
 {
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
         "DELETE FROM Posts  WHERE id = ?;"));
@@ -303,25 +304,25 @@ E<void> DataSourceSqlite::deletePost(int64_t id) const
     DO_OR_RETURN(db->execute(std::move(sql)));
     if(db->changedRowsCount() != 1)
     {
-        return std::unexpected(runtimeError("Failed to delete post."));
+        return std::unexpected(mw::runtimeError("Failed to delete post."));
     }
     return {};
 }
 
-E<void> DataSourceSqlite::addAttachment(Attachment&& att) const
+mw::E<void> DataSourceSqlite::addAttachment(Attachment&& att) const
 {
-    ASSIGN_OR_RETURN(SQLiteStatement sql, db->statementFromStr(
+    ASSIGN_OR_RETURN(mw::SQLiteStatement sql, db->statementFromStr(
         "INSERT OR IGNORE INTO Attachments (original_name, hash, upload_time,"
         " content_type) VALUES (?, ?, ?, ?);"));
     DO_OR_RETURN(sql.bind(att.original_name, att.hash,
-                          timeToSeconds(Clock::now()), att.content_type));
+                          mw::timeToSeconds(mw::Clock::now()), att.content_type));
     return db->execute(std::move(sql));
 }
 
-E<std::optional<Attachment>>
+mw::E<std::optional<Attachment>>
 DataSourceSqlite::getAttachment(const std::string& hash) const
 {
-    ASSIGN_OR_RETURN(SQLiteStatement sql, db->statementFromStr(
+    ASSIGN_OR_RETURN(mw::SQLiteStatement sql, db->statementFromStr(
         "SELECT original_name, upload_time, content_type FROM Attachments "
         "WHERE hash = ?;"));
     DO_OR_RETURN(sql.bind(hash));
@@ -334,12 +335,12 @@ DataSourceSqlite::getAttachment(const std::string& hash) const
     Attachment att;
     att.original_name = std::get<0>(rows[0]);
     att.hash = hash;
-    att.upload_time = secondsToTime(std::get<1>(rows[0]));
+    att.upload_time = mw::secondsToTime(std::get<1>(rows[0]));
     att.content_type = std::get<2>(rows[0]);
     return att;
 }
 
-E<std::vector<Attachment>> DataSourceSqlite::getAttachments() const
+mw::E<std::vector<Attachment>> DataSourceSqlite::getAttachments() const
 {
     ASSIGN_OR_RETURN(
         auto rows, (db->eval<std::string, std::string, int64_t, std::string>(
@@ -351,14 +352,14 @@ E<std::vector<Attachment>> DataSourceSqlite::getAttachments() const
         result.emplace_back(
             std::get<0>(row),
             std::get<1>(row),
-            secondsToTime(std::get<2>(row)),
+            mw::secondsToTime(std::get<2>(row)),
             std::get<3>(row)
         );
     }
     return result;
 }
 
-E<void> DataSourceSqlite::deleteAttachment(const std::string& hash) const
+mw::E<void> DataSourceSqlite::deleteAttachment(const std::string& hash) const
 {
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
         "DELETE FROM Attachments WHERE hash = ?;"));
@@ -366,15 +367,15 @@ E<void> DataSourceSqlite::deleteAttachment(const std::string& hash) const
     DO_OR_RETURN(db->execute(std::move(sql)));
     if(db->changedRowsCount() != 1)
     {
-        return std::unexpected(runtimeError("Failed to delete attachment."));
+        return std::unexpected(mw::runtimeError("Failed to delete attachment."));
     }
     return {};
 }
 
-E<DataSourceInterface::ReferralCounts>
+mw::E<DataSourceInterface::ReferralCounts>
 DataSourceSqlite::getReferralsOfAttachment(const std::string& hash) const
 {
-    ASSIGN_OR_RETURN(SQLiteStatement sql, db->statementFromStr(
+    ASSIGN_OR_RETURN(mw::SQLiteStatement sql, db->statementFromStr(
         "SELECT origin, request_count FROM AttachmentReferrals "
         "WHERE hash = ?;"));
     DO_OR_RETURN(sql.bind(hash));
@@ -387,17 +388,17 @@ DataSourceSqlite::getReferralsOfAttachment(const std::string& hash) const
     return refs;
 }
 
-E<void> DataSourceSqlite::addAttachmentReferral(
+mw::E<void> DataSourceSqlite::addAttachmentReferral(
     const std::string& attachment_hash, const std::string& url) const
 {
-    ASSIGN_OR_RETURN(SQLiteStatement sql, db->statementFromStr(
+    ASSIGN_OR_RETURN(mw::SQLiteStatement sql, db->statementFromStr(
         "SELECT request_count FROM AttachmentReferrals "
         "WHERE hash = ? AND origin = ?;"));
     DO_OR_RETURN(sql.bind(attachment_hash, url));
     ASSIGN_OR_RETURN(auto rows, db->eval<int64_t>(std::move(sql)));
     if(rows.empty())
     {
-        ASSIGN_OR_RETURN(SQLiteStatement sql, db->statementFromStr(
+        ASSIGN_OR_RETURN(mw::SQLiteStatement sql, db->statementFromStr(
             "INSERT INTO AttachmentReferrals (hash, origin, request_count) "
             "VALUES (?, ?, 1);"));
         DO_OR_RETURN(sql.bind(attachment_hash, url));
@@ -405,7 +406,7 @@ E<void> DataSourceSqlite::addAttachmentReferral(
     }
     else
     {
-        ASSIGN_OR_RETURN(SQLiteStatement sql, db->statementFromStr(
+        ASSIGN_OR_RETURN(mw::SQLiteStatement sql, db->statementFromStr(
             "UPDATE AttachmentReferrals SET request_count = request_count + 1 "
             "WHERE hash = ? AND origin = ?;"));
         DO_OR_RETURN(sql.bind(attachment_hash, url));
@@ -413,29 +414,29 @@ E<void> DataSourceSqlite::addAttachmentReferral(
     }
 }
 
-E<void> DataSourceSqlite::forceSetPostTimes(
-    int64_t id, const Time& publish, const std::optional<Time>& update) const
+mw::E<void> DataSourceSqlite::forceSetPostTimes(
+    int64_t id, const mw::Time& publish, const std::optional<mw::Time>& update) const
 {
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
         "UPDATE Posts SET publish_time = ? WHERE id = ?;"));
-    DO_OR_RETURN(sql.bind(timeToSeconds(publish), id));
+    DO_OR_RETURN(sql.bind(mw::timeToSeconds(publish), id));
     DO_OR_RETURN(db->execute(std::move(sql)));
     if(update.has_value())
     {
         ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
             "UPDATE Posts SET update_time = ? WHERE id = ?;"));
-        DO_OR_RETURN(sql.bind(timeToSeconds(*update), id));
+        DO_OR_RETURN(sql.bind(mw::timeToSeconds(*update), id));
         DO_OR_RETURN(db->execute(std::move(sql)));
     }
     return {};
 }
 
-E<void> DataSourceSqlite::setSchemaVersion(int64_t v) const
+mw::E<void> DataSourceSqlite::setSchemaVersion(int64_t v) const
 {
     return db->execute(std::format("PRAGMA user_version = {};", v));
 }
 
-E<std::vector<Post>> DataSourceSqlite::filterPosts(std::string_view sql_suffix)
+mw::E<std::vector<Post>> DataSourceSqlite::filterPosts(std::string_view sql_suffix)
     const
 {
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
@@ -455,7 +456,7 @@ E<std::vector<Post>> DataSourceSqlite::filterPosts(std::string_view sql_suffix)
     return posts;
 }
 
-E<std::optional<nlohmann::json>> DataSourceSqlite::getValue(
+mw::E<std::optional<nlohmann::json>> DataSourceSqlite::getValue(
     const std::string& key) const
 {
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
@@ -469,12 +470,12 @@ E<std::optional<nlohmann::json>> DataSourceSqlite::getValue(
     nlohmann::json v = parseJSON(std::get<0>(rows[0]));
     if(v.is_discarded())
     {
-        return std::unexpected(runtimeError("Invalid JSON value"));
+        return std::unexpected(mw::runtimeError("Invalid JSON value"));
     }
     return v;
 }
 
-E<void> DataSourceSqlite::setValue(const std::string& key,
+mw::E<void> DataSourceSqlite::setValue(const std::string& key,
                                    nlohmann::json&& value) const
 {
     ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
@@ -485,12 +486,12 @@ E<void> DataSourceSqlite::setValue(const std::string& key,
     DO_OR_RETURN(db->execute(std::move(sql)));
     if(db->changedRowsCount() != 1)
     {
-        return std::unexpected(runtimeError("Failed to set value."));
+        return std::unexpected(mw::runtimeError("Failed to set value."));
     }
     return {};
 }
 
-E<Time> DataSourceSqlite::getLatestUpdateTime() const
+mw::E<mw::Time> DataSourceSqlite::getLatestUpdateTime() const
 {
     ASSIGN_OR_RETURN(auto rows, (db->eval<int64_t, int64_t>(
         "SELECT publish_time, update_time FROM Posts;")));
@@ -506,5 +507,5 @@ E<Time> DataSourceSqlite::getLatestUpdateTime() const
             max_time = std::get<1>(row);
         }
     }
-    return secondsToTime(max_time);
+    return mw::secondsToTime(max_time);
 }

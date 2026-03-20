@@ -3,8 +3,8 @@
 #include "config.hpp"
 #include "post.hpp"
 #include "post_rendering.hpp"
-#include "error.hpp"
-#include "test_utils.hpp"
+#include <mw/error.hpp>
+#include <mw/test_utils.hpp>
 
 TEST(Post, CanRenderAsciiDoc)
 {
