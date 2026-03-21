@@ -15,6 +15,8 @@
 #include "post.hpp"
 #include <mw/error.hpp>
 
+constexpr int64_t DB_SCHEMA_VERSION = 1;
+
 class DataSourceInterface
 {
 public:

@@ -74,7 +74,7 @@ DataSourceSqlite::fromFile(const std::string& db_file)
 {
     auto data_source = std::make_unique<DataSourceSqlite>();
     ASSIGN_OR_RETURN(data_source->db, mw::SQLite::connectFile(db_file));
-    DO_OR_RETURN(data_source->setSchemaVersion(1));
+    DO_OR_RETURN(data_source->setSchemaVersion(DB_SCHEMA_VERSION));
     DO_OR_RETURN(data_source->db->execute(
         "CREATE TABLE IF NOT EXISTS Posts "
         "(id INTEGER PRIMARY KEY AUTOINCREMENT, markup INTEGER, title TEXT,"
