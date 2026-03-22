@@ -23,3 +23,13 @@ TEST(Post, CanRenderAsciiDoc)
 </div>
 )");
 }
+
+TEST(Post, CanRenderMarkdown)
+{
+    Configuration conf;
+    Post p;
+    p.markup = Post::COMMONMARK;
+    p.raw_content = "# Test\n\nIt’s a test\n";
+    ASSIGN_OR_FAIL(std::string rendered, renderPost(p, conf));
+    EXPECT_EQ(rendered, "<h1>Test</h1>\n<p>It’s a test</p>\n");
+}

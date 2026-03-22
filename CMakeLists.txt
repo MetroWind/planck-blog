@@ -48,9 +48,8 @@ FetchContent_Declare(
 )
 
 FetchContent_Declare(
-  cmark
-  GIT_REPOSITORY https://github.com/commonmark/cmark.git
-  GIT_TAG 0.31.1
+  macrodown
+  GIT_REPOSITORY https://git.xeno.darksair.org/macrodown.git
 )
 
 set(LIBMW_BUILD_URL ON)
@@ -59,7 +58,14 @@ set(LIBMW_BUILD_HTTP_SERVER ON)
 set(LIBMW_BUILD_CRYPTO ON)
 
 set(SPDLOG_USE_STD_FORMAT ON)
-FetchContent_MakeAvailable(libmw json inja cxxopts googletest ryml spdlog cmark)
+FetchContent_MakeAvailable(libmw json inja cxxopts googletest ryml spdlog macrodown)
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated_includes)
+file(CREATE_LINK 
+    ${macrodown_SOURCE_DIR}/include 
+    ${CMAKE_CURRENT_BINARY_DIR}/generated_includes/macrodown 
+    SYMBOLIC
+)
 unset(BUILD_BENCHMARK)
 
 find_package(CURL REQUIRED)
@@ -100,7 +106,7 @@ set(LIBS
   ${CURL_LIBRARIES}
   ${SQLite3_LIBRARIES}
   ${libmagic_LIBRARIES}
-  cmark
+  MacroDown::MacroDown
 )
 
 set(INCLUDES
@@ -110,6 +116,7 @@ set(INCLUDES
   ${inja_SOURCE_DIR}/single_include/inja
   ${SQLite3_INCLUDE_DIRS}
   ${libmagic_INCLUDE_DIRS}
+  ${CMAKE_CURRENT_BINARY_DIR}/generated_includes
 )
 
 add_executable(planck-blog ${SOURCE_FILES} src/main.cpp)

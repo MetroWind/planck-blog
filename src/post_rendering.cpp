@@ -2,7 +2,8 @@
 #include <string>
 #include <format>
 
-#include <cmark.h>
+#include <macrodown/macrodown.h>
+#include <macrodown/standard_library.h>
 
 #include <unistd.h>
 #include <mw/exec.hpp>
@@ -16,15 +17,16 @@ namespace
 
 mw::E<std::string> renderMarkdown(const std::string& src)
 {
-    char* html = cmark_markdown_to_html(src.data(), src.size(),
-                                        CMARK_OPT_DEFAULT);
-    if(html == nullptr)
-    {
-        return std::unexpected(mw::runtimeError("Failed to render Markdown."));
+    macrodown::MacroDown md;
+    macrodown::StandardLibrary::registerMacros(md.evaluator());
+
+    auto ast = md.parse(src);
+    if (!ast) {
+        return std::unexpected(mw::runtimeError("Failed to parse Markdown with MacroDown."));
     }
-    std::string result = html;
-    free(html);
-    return result;
+
+    std::string html = md.render(*ast);
+    return html;
 }
 
 mw::E<std::string> renderAsciiDoc(const std::string& src)
