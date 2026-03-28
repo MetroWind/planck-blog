@@ -50,43 +50,10 @@ jobs:
         echo "pkg_path=$PKG_PATH" >> $GITHUB_OUTPUT
         echo "pkg_name=$(basename $PKG_PATH)" >> $GITHUB_OUTPUT
 
-    - name: Create Draft Release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Release
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: arch-${{ github.sha }}
-        release_name: Arch Package ${{ github.sha }}
-        draft: true
-        prerelease: false
-
-    - name: Upload Package Asset
-      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.find_package.outputs.pkg_path }}
-        asset_name: planck-blog-git.pkg.tar.zst
-        asset_content_type: application/zstd
-
-    - name: Upload Binary Asset
-      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: planck-blog.zst
-        asset_name: planck-blog.zst
-        asset_content_type: application/zstd
-
-    - uses: eregon/publish-release@v1
-      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        release_id: ${{ steps.create_release.outputs.id }}
+        name: Arch Package ${{ github.sha }}
+        files: |
+          ${{ steps.find_package.outputs.pkg_path }}
+          planck-blog.zst
