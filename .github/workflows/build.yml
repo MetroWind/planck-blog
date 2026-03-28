@@ -57,6 +57,6 @@ jobs:
 
     - name: Release
       run: |
-        hub release create "Arch Package ${{ github.sha }}" -m "It’s a release" -a ${{ steps.find_package.outputs.pkg_path }} -a planck-blog.zst
+        hub release create -a ${{ steps.find_package.outputs.pkg_path }} -a planck-blog.zst -m "It’s a release" "build-${{ github.sha }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
