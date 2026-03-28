@@ -25,7 +25,9 @@ jobs:
         fetch-depth: 0
 
     - name: Get tags to make sure the repo is valid
-      run: git fetch --tags origin
+      run: |
+        git config --global --add safe.directory $(pwd)
+        git fetch --tags origin
 
     - name: Build Package
       run: |
