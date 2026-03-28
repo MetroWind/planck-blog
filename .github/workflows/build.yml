@@ -12,10 +12,6 @@ jobs:
     container: archlinux:base-devel
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
     - name: Install dependencies
       run: |
         pacman -Syu --noconfirm
@@ -23,6 +19,10 @@ jobs:
         # Add user builder
         useradd -m builder
         echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Build Package
       run: |
