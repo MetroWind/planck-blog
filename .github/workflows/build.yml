@@ -19,7 +19,7 @@ jobs:
     - name: Install dependencies
       run: |
         pacman -Syu --noconfirm
-        pacman -S --noconfirm git cmake zstd
+        pacman -S --noconfirm git cmake zstd hub
         # Add user builder
         useradd -m builder
         echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
