@@ -51,9 +51,7 @@ jobs:
         echo "pkg_name=$(basename $PKG_PATH)" >> $GITHUB_OUTPUT
 
     - name: Release
-      uses: softprops/action-gh-release@v2
-      with:
-        name: Arch Package ${{ github.sha }}
-        files: |
-          ${{ steps.find_package.outputs.pkg_path }}
-          planck-blog.zst
+      run: |
+        hub release create "Arch Package ${{ github.sha }}" -m "It’s a release" -a ${{ steps.find_package.outputs.pkg_path }} -a planck-blog.zst
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
