@@ -1,41 +1,42 @@
-#include "json_utils.hpp"
+#include <filesystem>
 #include <memory>
 #include <variant>
-#include <filesystem>
 
 #include <cxxopts.hpp>
+#include <mw/auth.hpp>
+#include <mw/http_client.hpp>
+#include <mw/url.hpp>
+#include <mw/utils.hpp>
 #include <spdlog/spdlog.h>
 
 #include "app.hpp"
-#include <mw/auth.hpp>
 #include "config.hpp"
 #include "data.hpp"
-#include <mw/http_client.hpp>
+#include "json_utils.hpp"
 #include "legacy-migration.hpp"
 #include "spdlog/common.h"
 #include "spdlog/spdlog.h"
-#include <mw/utils.hpp>
-#include <mw/url.hpp>
 
 int main(int argc, char** argv)
 {
     // spdlog::set_level(spdlog::level::debug);
     cxxopts::Options cmd_options(
         "Planck Blog", "A naively simple blog server that is barely enough");
-    cmd_options.add_options()
-        ("c,config", "Config file",
-         cxxopts::value<std::string>()->default_value("/etc/planck-blog.yaml"))
-        ("legacy-migration", "Migrate the legacy posts from a directory and exit",
-         cxxopts::value<std::string>())
-        ("delete-post", "Delete a post or draft by ID and exit",
-         cxxopts::value<int64_t>())
-        ("delete-attachment", "Delete an attachment by hash and exit",
-         cxxopts::value<std::string>())
-        ("set", "Set a runtime setting and exit. Example:"
-         " --set pause-update-time=true. The only setting available right now"
-         " is pause-update-time.",
-         cxxopts::value<std::string>())
-        ("h,help", "Print this message.");
+    cmd_options.add_options()(
+        "c,config", "Config file",
+        cxxopts::value<std::string>()->default_value("/etc/planck-blog.yaml"))(
+        "legacy-migration",
+        "Migrate the legacy posts from a directory and exit",
+        cxxopts::value<std::string>())("delete-post",
+                                       "Delete a post or draft by ID and exit",
+                                       cxxopts::value<int64_t>())(
+        "delete-attachment", "Delete an attachment by hash and exit",
+        cxxopts::value<std::string>())(
+        "set",
+        "Set a runtime setting and exit. Example:"
+        " --set pause-update-time=true. The only setting available right now"
+        " is pause-update-time.",
+        cxxopts::value<std::string>())("h,help", "Print this message.");
     auto opts = cmd_options.parse(argc, argv);
 
     if(opts.count("help"))
@@ -56,8 +57,8 @@ int main(int argc, char** argv)
 
     if(opts.count("legacy-migration") == 1)
     {
-        auto ok_maybe = migrate(
-            opts["legacy-migration"].as<std::string>(), *conf);
+        auto ok_maybe =
+            migrate(opts["legacy-migration"].as<std::string>(), *conf);
         if(ok_maybe)
         {
             return 0;
@@ -103,7 +104,8 @@ int main(int argc, char** argv)
                           errorMsg(data_source.error()));
             return 2;
         }
-        mw::E<void> ok_maybe = (*data_source)->deleteAttachment(std::move(hash));
+        mw::E<void> ok_maybe =
+            (*data_source)->deleteAttachment(std::move(hash));
         if(ok_maybe)
         {
             return 0;
@@ -126,7 +128,7 @@ int main(int argc, char** argv)
             spdlog::error("Invalid key");
             return 1;
         }
-        nlohmann::json value = parseJSON(mw::strip(keyvalue.substr(index+1)));
+        nlohmann::json value = parseJSON(mw::strip(keyvalue.substr(index + 1)));
         if(value.is_discarded())
         {
             spdlog::error("Invalid value");
@@ -140,8 +142,8 @@ int main(int argc, char** argv)
                           errorMsg(data_source.error()));
             return 2;
         }
-        auto ok_maybe = (*data_source)->setValue(std::string(key),
-                                                 std::move(value));
+        auto ok_maybe =
+            (*data_source)->setValue(std::string(key), std::move(value));
         if(ok_maybe)
         {
             return 0;
@@ -166,9 +168,9 @@ int main(int argc, char** argv)
         std::make_unique<mw::HTTPSession>());
     if(!auth.has_value())
     {
-        spdlog::error("Failed to create authentication module: {}",
-                      std::visit([](const auto& e) { return e.msg; },
-                                 auth.error()));
+        spdlog::error(
+            "Failed to create authentication module: {}",
+            std::visit([](const auto& e) { return e.msg; }, auth.error()));
         return 1;
     }
     auto data_source = DataSourceSqlite::fromFile(

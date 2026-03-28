@@ -3,9 +3,10 @@
 #include <string>
 #include <unordered_map>
 
+#include <mw/error.hpp>
+
 #include "config.hpp"
 #include "post.hpp"
-#include <mw/error.hpp>
 
 // Render a post to bare HTML (HTML that only contains the post
 // itself). This does not do template substitution to the content of

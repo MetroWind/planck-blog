@@ -1,17 +1,18 @@
 #pragma once
 
 #include <ctime>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
 #include <sstream>
-#include <tuple>
 #include <string_view>
+#include <tuple>
+
+#include <mw/error.hpp>
+#include <mw/utils.hpp>
 
 #include "config.hpp"
 #include "data.hpp"
-#include <mw/error.hpp>
 #include "post.hpp"
-#include <mw/utils.hpp>
 
 namespace fs = std::filesystem;
 
@@ -96,8 +97,8 @@ inline Post readLegacyPost(const fs::path& filename)
 inline std::vector<Post> discoverPosts(const fs::path& post_dir)
 {
     std::vector<Post> ps;
-    for(const fs::directory_entry& entry:
-            fs::recursive_directory_iterator(post_dir))
+    for(const fs::directory_entry& entry :
+        fs::recursive_directory_iterator(post_dir))
     {
         if(!entry.is_regular_file())
         {
@@ -108,16 +109,19 @@ inline std::vector<Post> discoverPosts(const fs::path& post_dir)
     return ps;
 }
 
-inline mw::E<void> migrate(const fs::path& post_dir, const Configuration& config)
+inline mw::E<void> migrate(const fs::path& post_dir,
+                           const Configuration& config)
 {
-    ASSIGN_OR_RETURN(auto data_source, DataSourceSqlite::fromFile(
-        (std::filesystem::path(config.data_dir) / "data.db").string()));
-    for(const Post& p: discoverPosts(post_dir))
+    ASSIGN_OR_RETURN(
+        auto data_source,
+        DataSourceSqlite::fromFile(
+            (std::filesystem::path(config.data_dir) / "data.db").string()));
+    for(const Post& p : discoverPosts(post_dir))
     {
         ASSIGN_OR_RETURN(int64_t id, data_source->saveDraft(Post(p)));
         DO_OR_RETURN(data_source->publishPost(id));
-        DO_OR_RETURN(data_source->forceSetPostTimes(
-            id, *p.publish_time, p.update_time));
+        DO_OR_RETURN(
+            data_source->forceSetPostTimes(id, *p.publish_time, p.update_time));
     }
     return {};
 }

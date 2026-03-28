@@ -1,14 +1,14 @@
+#include "theme.hpp"
+
 #include <algorithm>
 #include <expected>
 #include <filesystem>
 #include <fstream>
 
-#include <ryml.hpp>
-#include <ryml_std.hpp>
-
-#include "theme.hpp"
 #include <mw/error.hpp>
 #include <mw/utils.hpp>
+#include <ryml.hpp>
+#include <ryml_std.hpp>
 
 namespace fs = std::filesystem;
 
@@ -44,7 +44,7 @@ mw::E<Theme> readThemeDir(const fs::path& dir)
     }
 
     // Find all stylesheets.
-    for(const fs::directory_entry& entry: fs::directory_iterator(dir))
+    for(const fs::directory_entry& entry : fs::directory_iterator(dir))
     {
         fs::path path = entry.path();
         std::string ext = path.extension();
@@ -62,7 +62,7 @@ mw::E<Theme> readThemeDir(const fs::path& dir)
 
 mw::E<void> ThemeManager::loadDir(const std::filesystem::path& dir)
 {
-    for(const fs::directory_entry& entry: fs::directory_iterator(dir))
+    for(const fs::directory_entry& entry : fs::directory_iterator(dir))
     {
         // First layer of dirs is themes. Each subdirectory is a theme.
         if(entry.is_directory())
@@ -78,7 +78,7 @@ mw::E<void> ThemeManager::loadDir(const std::filesystem::path& dir)
     }
 
     // Go though all themes to establish hierarchy.
-    for(auto& theme_pair: themes)
+    for(auto& theme_pair : themes)
     {
         Theme& theme = theme_pair.second;
         if(theme.parent_name.empty())
@@ -90,16 +90,16 @@ mw::E<void> ThemeManager::loadDir(const std::filesystem::path& dir)
         if(it == themes.end())
         {
             return std::unexpected(mw::runtimeError(
-                std::format("Couldn’t find theme {}’s parent, {}",
-                            theme.name, theme.parent_name)));
+                std::format("Couldn’t find theme {}’s parent, {}", theme.name,
+                            theme.parent_name)));
         }
         theme.parent = &(it->second);
     }
     return {};
 }
 
-std::vector<std::filesystem::path> ThemeManager::stylesheets(
-        const std::string& theme_name) const
+std::vector<std::filesystem::path>
+ThemeManager::stylesheets(const std::string& theme_name) const
 {
     std::vector<std::filesystem::path> result;
     const Theme* theme = nullptr;
@@ -122,7 +122,7 @@ std::vector<std::filesystem::path> ThemeManager::stylesheets(
 std::vector<std::string> ThemeManager::themeNames() const
 {
     std::vector<std::string> result;
-    for(const auto& theme_pair: themes)
+    for(const auto& theme_pair : themes)
     {
         result.push_back(theme_pair.first);
     }

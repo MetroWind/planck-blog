@@ -1,15 +1,15 @@
-#include <optional>
 #include <chrono>
+#include <optional>
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <mw/error.hpp>
+#include <mw/test_utils.hpp>
+#include <mw/utils.hpp>
 
 #include "attachment.hpp"
 #include "data.hpp"
-#include <mw/error.hpp>
-#include <mw/utils.hpp>
 #include "post.hpp"
-#include <mw/test_utils.hpp>
 
 using ::testing::IsEmpty;
 
@@ -100,7 +100,8 @@ TEST(DataSource, CanAddAndDeleteAttachments)
         EXPECT_GT(mw::timeToSeconds(atts[0].upload_time), 0);
     }
     {
-        ASSIGN_OR_FAIL(std::optional<Attachment> att, data->getAttachment("bbb"));
+        ASSIGN_OR_FAIL(std::optional<Attachment> att,
+                       data->getAttachment("bbb"));
         ASSERT_TRUE(att.has_value());
         EXPECT_EQ(att->content_type, "aaa");
         EXPECT_EQ(att->hash, "bbb");
@@ -144,5 +145,50 @@ TEST(DataSource, CanAddAttachmentReferral)
         expected["zzz"] = 2;
         expected["yyy"] = 1;
         EXPECT_EQ(refs, expected);
+    }
+}
+
+TEST(DataSource, WebMention)
+{
+    ASSIGN_OR_FAIL(std::unique_ptr<DataSourceSqlite> data,
+                   DataSourceSqlite::newFromMemory());
+
+    Post p;
+    p.markup = Post::COMMONMARK;
+    p.language = "en-US";
+    p.raw_content = "aaa";
+    p.abstract = "bbb";
+    ASSIGN_OR_FAIL(int64_t id, data->saveDraft(std::move(p)));
+    ASSERT_TRUE(isExpected(data->publishPost(id)));
+
+    WebMention wm;
+    wm.source = "https://source.com";
+    wm.target_id = id;
+    wm.status = "pending";
+    wm.created_at = 12345;
+
+    ASSIGN_OR_FAIL(int64_t wmid, data->insertWebMention(wm));
+
+    {
+        ASSIGN_OR_FAIL(auto mentions, data->getVerifiedWebMentionsForPost(id));
+        EXPECT_EQ(mentions.size(), 0);
+    }
+
+    ASSERT_TRUE(isExpected(data->updateWebMention(
+        wmid, "verified", "John Doe", "https://photo.com", "<p>Hello</p>")));
+
+    {
+        ASSIGN_OR_FAIL(auto mentions, data->getVerifiedWebMentionsForPost(id));
+        EXPECT_EQ(mentions.size(), 1);
+        EXPECT_EQ(mentions[0].source, "https://source.com");
+        EXPECT_EQ(mentions[0].author_name, "John Doe");
+        EXPECT_EQ(mentions[0].author_photo, "https://photo.com");
+        EXPECT_EQ(mentions[0].content, "<p>Hello</p>");
+    }
+
+    ASSERT_TRUE(isExpected(data->deletePost(id)));
+    {
+        ASSIGN_OR_FAIL(auto mentions, data->getVerifiedWebMentionsForPost(id));
+        EXPECT_EQ(mentions.size(), 0);
     }
 }

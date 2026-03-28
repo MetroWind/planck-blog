@@ -1,21 +1,33 @@
 #pragma once
 
 #include <memory>
-#include <vector>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <optional>
 #include <unordered_map>
+#include <vector>
 
+#include <mw/database.hpp>
+#include <mw/error.hpp>
+#include <nlohmann/json.hpp>
 #include <sqlite3.h>
 
-#include <nlohmann/json.hpp>
 #include "attachment.hpp"
-#include <mw/database.hpp>
 #include "post.hpp"
-#include <mw/error.hpp>
 
-constexpr int64_t DB_SCHEMA_VERSION = 1;
+constexpr int64_t DB_SCHEMA_VERSION = 2;
+
+struct WebMention
+{
+    int64_t id;
+    std::string source;
+    int64_t target_id;
+    std::string status;
+    std::optional<std::string> author_name;
+    std::optional<std::string> author_photo;
+    std::optional<std::string> content;
+    int64_t created_at;
+};
 
 class DataSourceInterface
 {
@@ -73,35 +85,50 @@ public:
     // Delete an attachment by hash.
     virtual mw::E<void> deleteAttachment(const std::string& hash) const = 0;
     // Get all referrals of an attachment.
-    virtual mw::E<ReferralCounts> getReferralsOfAttachment(const std::string& hash)
-        const = 0;
+    virtual mw::E<ReferralCounts>
+    getReferralsOfAttachment(const std::string& hash) const = 0;
     // Increase the request count of an attachment from a specific mw::URL
     // by one. If there is no such referral, set the count to one.
-    virtual mw::E<void> addAttachmentReferral(const std::string& attachment_hash,
-                                          const std::string& url) const = 0;
+    virtual mw::E<void>
+    addAttachmentReferral(const std::string& attachment_hash,
+                          const std::string& url) const = 0;
 
     // The data source can act as a key-value store that stores JSON
     // values. This function retrieves a value from the store.
-    virtual mw::E<std::optional<nlohmann::json>> getValue(const std::string& key)
-        const = 0;
-    mw::E<nlohmann::json> getValueWithDefault(
-        const std::string& key, nlohmann::json&& default_value) const;
-    virtual mw::E<void> setValue(const std::string& key, nlohmann::json&& value)
-        const = 0;
+    virtual mw::E<std::optional<nlohmann::json>>
+    getValue(const std::string& key) const = 0;
+    mw::E<nlohmann::json>
+    getValueWithDefault(const std::string& key,
+                        nlohmann::json&& default_value) const;
+    virtual mw::E<void> setValue(const std::string& key,
+                                 nlohmann::json&& value) const = 0;
+
+    virtual mw::E<int64_t>
+    insertWebMention(const WebMention& mention) const = 0;
+    virtual mw::E<void>
+    updateWebMention(int64_t id, const std::string& status,
+                     std::optional<std::string> author_name,
+                     std::optional<std::string> author_photo,
+                     std::optional<std::string> content) const = 0;
+    virtual mw::E<std::vector<WebMention>>
+    getVerifiedWebMentionsForPost(int64_t postId) const = 0;
 
     // Get the time of the latest update (or publish).
     virtual mw::E<mw::Time> getLatestUpdateTime() const = 0;
 
+    virtual mw::E<void> schemaMigrate1To2() const = 0;
+
 protected:
     virtual mw::E<void> setSchemaVersion(int64_t v) const = 0;
-
 };
 
 class DataSourceSqlite : public DataSourceInterface
 {
 public:
     explicit DataSourceSqlite(std::unique_ptr<mw::SQLite> conn)
-            : db(std::move(conn)) {}
+        : db(std::move(conn))
+    {
+    }
 
     ~DataSourceSqlite() override = default;
     DataSourceSqlite(const DataSourceSqlite&) = delete;
@@ -128,26 +155,37 @@ public:
     mw::E<void> publishPost(int64_t id) const override;
     mw::E<void> deletePost(int64_t id) const override;
     mw::E<void> addAttachment(Attachment&& att) const override;
-    mw::E<std::optional<Attachment>> getAttachment(const std::string& hash)
-        const override;
+    mw::E<std::optional<Attachment>>
+    getAttachment(const std::string& hash) const override;
     mw::E<std::vector<Attachment>> getAttachments() const override;
     mw::E<void> deleteAttachment(const std::string& hash) const override;
-    mw::E<ReferralCounts> getReferralsOfAttachment(const std::string& hash)
-        const override;
+    mw::E<ReferralCounts>
+    getReferralsOfAttachment(const std::string& hash) const override;
     mw::E<void> addAttachmentReferral(const std::string& attachment_hash,
-                                  const std::string& url) const override;
-    mw::E<std::optional<nlohmann::json>> getValue(const std::string& key)
-        const override;
-    mw::E<void> setValue(const std::string& key, nlohmann::json&& value)
-        const override;
+                                      const std::string& url) const override;
+    mw::E<std::optional<nlohmann::json>>
+    getValue(const std::string& key) const override;
+    mw::E<void> setValue(const std::string& key,
+                         nlohmann::json&& value) const override;
+
+    mw::E<int64_t> insertWebMention(const WebMention& mention) const override;
+    mw::E<void>
+    updateWebMention(int64_t id, const std::string& status,
+                     std::optional<std::string> author_name,
+                     std::optional<std::string> author_photo,
+                     std::optional<std::string> content) const override;
+    mw::E<std::vector<WebMention>>
+    getVerifiedWebMentionsForPost(int64_t postId) const override;
 
     mw::E<mw::Time> getLatestUpdateTime() const override;
+
+    mw::E<void> schemaMigrate1To2() const override;
 
     // Do not use.
     DataSourceSqlite() = default;
 
     mw::E<void> forceSetPostTimes(int64_t id, const mw::Time& publish,
-                              const std::optional<mw::Time>& update) const;
+                                  const std::optional<mw::Time>& update) const;
 
 protected:
     mw::E<void> setSchemaVersion(int64_t v) const override;
