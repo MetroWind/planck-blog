@@ -52,11 +52,11 @@ jobs:
       id: find_package
       run: |
         PKG_PATH=$(find packages/arch -maxdepth 1 -name "*.pkg.tar.zst" ! -name "*-debug-*" | head -n 1)
-        echo "pkg_path=$PKG_PATH" >> $GITHUB_OUTPUT
-        echo "pkg_name=$(basename $PKG_PATH)" >> $GITHUB_OUTPUT
+        mv "$PKG_PATH" planck-blog-git-archlinux-x86_64.pkg.tar.zst
 
     - name: Release
       run: |
-        hub release create -a ${{ steps.find_package.outputs.pkg_path }} -a planck-blog.zst -m "It’s a release" "build-${{ github.sha }}"
+        BUILD_ID="$(git rev-list --count HEAD)-$(git rev-parse --short=7 HEAD)"
+        hub release create -a planck-blog-git-archlinux-x86_64.pkg.tar.zst -a planck-blog.zst -m "Build $BUILD_ID" "build-$BUILD_ID"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
