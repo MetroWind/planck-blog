@@ -5,6 +5,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 project(Blog)
 
+set(PLANCK_BUILD_TEST FALSE)
+
 include(FetchContent)
 FetchContent_Declare(
   libmw
@@ -61,9 +63,9 @@ set(SPDLOG_USE_STD_FORMAT ON)
 FetchContent_MakeAvailable(libmw json inja cxxopts googletest ryml spdlog macrodown)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated_includes)
-file(CREATE_LINK 
-    ${macrodown_SOURCE_DIR}/include 
-    ${CMAKE_CURRENT_BINARY_DIR}/generated_includes/macrodown 
+file(CREATE_LINK
+    ${macrodown_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_BINARY_DIR}/generated_includes/macrodown
     SYMBOLIC
 )
 unset(BUILD_BENCHMARK)
@@ -127,33 +129,35 @@ target_compile_options(planck-blog PRIVATE -Wall -Wextra -Wpedantic -Wno-depreca
 target_include_directories(planck-blog PRIVATE ${INCLUDES})
 target_link_libraries(planck-blog PRIVATE ${LIBS})
 
-set(TEST_FILES
-  src/app_test.cpp
-  src/attachment_test.cpp
-  src/data_test.cpp
-  src/post_rendering_test.cpp
-)
+if(PLANCK_BUILD_TEST)
+  set(TEST_FILES
+    src/app_test.cpp
+    src/attachment_test.cpp
+    src/data_test.cpp
+    src/post_rendering_test.cpp
+  )
 
-# ctest --test-dir build
-add_executable(planck-blog_test ${SOURCE_FILES} ${TEST_FILES})
-set_property(TARGET planck-blog_test PROPERTY CXX_STANDARD 23)
+  # ctest --test-dir build
+  add_executable(planck-blog_test ${SOURCE_FILES} ${TEST_FILES})
+  set_property(TARGET planck-blog_test PROPERTY CXX_STANDARD 23)
 
-set_property(TARGET planck-blog_test PROPERTY COMPILE_WARNING_AS_ERROR TRUE)
-target_compile_options(planck-blog_test PRIVATE -Wall -Wextra -Wpedantic -Wno-deprecated-literal-operator)
-target_include_directories(planck-blog_test PRIVATE
-  ${INCLUDES}
-  ${googletest_SOURCE_DIR}/googletest/include
-  ${googletest_SOURCE_DIR}/googlemock/include
-)
+  set_property(TARGET planck-blog_test PROPERTY COMPILE_WARNING_AS_ERROR TRUE)
+  target_compile_options(planck-blog_test PRIVATE -Wall -Wextra -Wpedantic -Wno-deprecated-literal-operator)
+  target_include_directories(planck-blog_test PRIVATE
+    ${INCLUDES}
+    ${googletest_SOURCE_DIR}/googletest/include
+    ${googletest_SOURCE_DIR}/googlemock/include
+  )
 
-target_link_libraries(planck-blog_test PRIVATE
-  ${LIBS}
-  GTest::gtest_main
-  GTest::gmock_main
-)
+  target_link_libraries(planck-blog_test PRIVATE
+    ${LIBS}
+    GTest::gtest_main
+    GTest::gmock_main
+  )
 
-enable_testing()
-include(GoogleTest)
-gtest_discover_tests(planck-blog_test
-  # Need this so that the unit tests can find the templates.
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  enable_testing()
+  include(GoogleTest)
+  gtest_discover_tests(planck-blog_test
+    # Need this so that the unit tests can find the templates.
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
