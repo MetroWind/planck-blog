@@ -5,7 +5,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 project(Blog)
 
-set(PLANCK_BUILD_TEST FALSE)
+option(PLANCK_BUILD_TEST "Build unit tests." OFF)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -60,7 +60,11 @@ set(LIBMW_BUILD_HTTP_SERVER ON)
 set(LIBMW_BUILD_CRYPTO ON)
 
 set(SPDLOG_USE_STD_FORMAT ON)
-FetchContent_MakeAvailable(libmw json inja cxxopts googletest ryml spdlog macrodown)
+FetchContent_MakeAvailable(libmw json inja cxxopts ryml spdlog macrodown)
+
+if(PLANCK_BUILD_TEST)
+  FetchContent_MakeAvailable(googletest)
+endif()
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated_includes)
 file(CREATE_LINK
