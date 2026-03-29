@@ -1,7 +1,7 @@
 #pragma once
 
-#include <filesystem>
 #include <string>
+#include <filesystem>
 #include <unordered_map>
 #include <vector>
 
@@ -30,8 +30,8 @@ public:
     // referenced in an HTML file. If the theme is not found, return
     // an empty vector. The returned paths are relative to the themes
     // dir.
-    std::vector<std::filesystem::path>
-    stylesheets(const std::string& theme_name) const;
+    std::vector<std::filesystem::path> stylesheets(
+        const std::string& theme_name) const;
 
     // Return the names of all themes.
     std::vector<std::string> themeNames() const;

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <optional>
-#include <string>
 #include <vector>
+#include <string>
+#include <optional>
 
 #include <gmock/gmock.h>
-#include <mw/error.hpp>
 
-#include "attachment.hpp"
 #include "data.hpp"
+#include <mw/error.hpp>
+#include "attachment.hpp"
 #include "post.hpp"
 
 class DataSourceMock : public DataSourceInterface
@@ -20,23 +20,18 @@ public:
     MOCK_METHOD(mw::E<std::vector<Post>>, getPosts, (), (const override));
     MOCK_METHOD(mw::E<std::vector<Post>>, getPosts, (int start, int count),
                 (const override));
-    MOCK_METHOD(mw::E<std::vector<Post>>, getPostExcerpts, (),
-                (const override));
-    MOCK_METHOD(mw::E<std::optional<Post>>, getPost, (int64_t id),
-                (const override));
-    MOCK_METHOD(mw::E<void>, updatePost, (Post && new_post), (const override));
+    MOCK_METHOD(mw::E<std::vector<Post>>, getPostExcerpts, (), (const override));
+    MOCK_METHOD(mw::E<std::optional<Post>>, getPost, (int64_t id), (const override));
+    MOCK_METHOD(mw::E<void>, updatePost, (Post&& new_post), (const override));
     MOCK_METHOD(mw::E<void>, updatePostNoUpdateTime, (const Post& new_post),
                 (const override));
-    MOCK_METHOD(mw::E<int64_t>, saveDraft, (Post && new_post),
-                (const override));
+    MOCK_METHOD(mw::E<int64_t>, saveDraft, (Post&& new_post), (const override));
     MOCK_METHOD(mw::E<std::vector<Post>>, getDrafts, (), (const override));
-    MOCK_METHOD(mw::E<std::optional<Post>>, getDraft, (int64_t id),
-                (const override));
+    MOCK_METHOD(mw::E<std::optional<Post>>, getDraft, (int64_t id), (const override));
     MOCK_METHOD(mw::E<void>, editDraft, (const Post& draft), (const override));
     MOCK_METHOD(mw::E<void>, publishPost, (int64_t id), (const override));
     MOCK_METHOD(mw::E<void>, deletePost, (int64_t id), (const override));
-    MOCK_METHOD(mw::E<void>, addAttachment, (Attachment && att),
-                (const override));
+    MOCK_METHOD(mw::E<void>, addAttachment, (Attachment&& att), (const override));
     MOCK_METHOD(mw::E<std::optional<Attachment>>, getAttachment,
                 (const std::string& hash), (const override));
     MOCK_METHOD(mw::E<std::vector<Attachment>>, getAttachments, (),
@@ -54,18 +49,6 @@ public:
                 (const std::string& key, nlohmann::json&& value),
                 (const override));
     MOCK_METHOD(mw::E<mw::Time>, getLatestUpdateTime, (), (const override));
-
-    MOCK_METHOD(mw::E<int64_t>, insertWebMention, (const WebMention& mention),
-                (const override));
-    MOCK_METHOD(mw::E<void>, updateWebMention,
-                (int64_t id, const std::string& status,
-                 std::optional<std::string> author_name,
-                 std::optional<std::string> author_photo,
-                 std::optional<std::string> content),
-                (const override));
-    MOCK_METHOD(mw::E<std::vector<WebMention>>, getVerifiedWebMentionsForPost,
-                (int64_t postId), (const override));
-    MOCK_METHOD(mw::E<void>, schemaMigrate1To2, (), (const override));
 
 protected:
     mw::E<void> setSchemaVersion([[maybe_unused]] int64_t v) const override

@@ -5,7 +5,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 project(Blog)
 
-option(PLANCK_BUILD_TEST "Build unit tests" OFF)
+set(PLANCK_BUILD_TEST FALSE)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -54,23 +54,13 @@ FetchContent_Declare(
   GIT_REPOSITORY https://git.xeno.darksair.org/macrodown.git
 )
 
-FetchContent_Declare(
-  tidy-html5
-  GIT_REPOSITORY https://github.com/htacg/tidy-html5.git
-)
-
 set(LIBMW_BUILD_URL ON)
 set(LIBMW_BUILD_SQLITE ON)
 set(LIBMW_BUILD_HTTP_SERVER ON)
 set(LIBMW_BUILD_CRYPTO ON)
 
 set(SPDLOG_USE_STD_FORMAT ON)
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5) # For tidy-html5
-FetchContent_MakeAvailable(libmw json inja cxxopts ryml spdlog macrodown tidy-html5)
-
-if(PLANCK_BUILD_TEST)
-  FetchContent_MakeAvailable(googletest)
-endif()
+FetchContent_MakeAvailable(libmw json inja cxxopts googletest ryml spdlog macrodown)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated_includes)
 file(CREATE_LINK
@@ -96,8 +86,6 @@ set(SOURCE_FILES
   src/config.hpp
   src/data.cpp
   src/data.hpp
-  src/html_sanitizer.cpp
-  src/html_sanitizer.hpp
   src/post.cpp
   src/post.hpp
   src/post_rendering.cpp
@@ -121,7 +109,6 @@ set(LIBS
   ${SQLite3_LIBRARIES}
   ${libmagic_LIBRARIES}
   MacroDown::MacroDown
-  tidy-static
 )
 
 set(INCLUDES
@@ -131,7 +118,6 @@ set(INCLUDES
   ${inja_SOURCE_DIR}/single_include/inja
   ${SQLite3_INCLUDE_DIRS}
   ${libmagic_INCLUDE_DIRS}
-  ${tidy-html5_SOURCE_DIR}/include
   ${CMAKE_CURRENT_BINARY_DIR}/generated_includes
 )
 
@@ -149,7 +135,6 @@ if(PLANCK_BUILD_TEST)
     src/attachment_test.cpp
     src/data_test.cpp
     src/post_rendering_test.cpp
-    src/html_sanitizer_test.cpp
   )
 
   # ctest --test-dir build

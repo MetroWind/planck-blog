@@ -2,10 +2,9 @@
 
 #include <string>
 
-#include <mw/crypto.hpp>
-#include <mw/utils.hpp>
-
 #include "config.hpp"
+#include <mw/utils.hpp>
+#include <mw/crypto.hpp>
 
 struct Attachment
 {
@@ -18,12 +17,12 @@ struct Attachment
 class AttachmentManager
 {
 public:
-    explicit AttachmentManager(mw::HasherInterface& h) : hasher(h) {}
+    explicit AttachmentManager(mw::HasherInterface& h): hasher(h) {}
 
     // Get an attachment object out of some bytes.
     Attachment attachmentFromBytes(const std::string& bytes,
                                    std::string_view filename,
-                                   std::string_view content_type = "") const;
+                                   std::string_view content_type="") const;
     // Get the path in the local file system of the attachment,
     // relative to the attachment dir set in the config.
     std::string path(const Attachment& att) const;

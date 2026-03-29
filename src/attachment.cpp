@@ -1,14 +1,13 @@
-#include "attachment.hpp"
-
-#include <filesystem>
 #include <string>
 #include <string_view>
+#include <filesystem>
 
 #include <magic.h>
+
+#include "attachment.hpp"
 #include <mw/crypto.hpp>
 
-namespace
-{
+namespace {
 
 // Probe and return the mime type of the given bytes. If the probe
 // fails, return “application/octet-stream”.
@@ -35,10 +34,9 @@ std::string probeMimeType(std::string_view bytes)
 
 } // namespace
 
-Attachment
-AttachmentManager::attachmentFromBytes(const std::string& bytes,
-                                       std::string_view filename,
-                                       std::string_view content_type) const
+Attachment AttachmentManager::attachmentFromBytes(
+    const std::string& bytes, std::string_view filename,
+    std::string_view content_type) const
 {
     Attachment att;
     att.hash = hasher.hashToHexStr(bytes).value();
@@ -58,5 +56,5 @@ std::string AttachmentManager::path(const Attachment& att) const
 {
     namespace fs = std::filesystem;
     return fs::path(att.hash.substr(0, 1)) /
-           (att.hash + fs::path(att.original_name).extension().string());
+        (att.hash + fs::path(att.original_name).extension().string());
 }
