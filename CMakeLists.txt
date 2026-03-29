@@ -2,6 +2,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5) # tidy-html
 
 project(Blog)
 
