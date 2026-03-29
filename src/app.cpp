@@ -30,6 +30,7 @@
 #include "app.hpp"
 #include "attachment.hpp"
 #include "config.hpp"
+#include "html_sanitizer.hpp"
 #include "post.hpp"
 #include "theme.hpp"
 
@@ -249,15 +250,21 @@ App::prepareSession(const httplib::Request& req, httplib::Response& res,
     return *session;
 }
 
+#include "webmention.hpp"
+
 App::App(const Configuration& conf,
          std::unique_ptr<mw::AuthInterface> openid_auth,
-         std::unique_ptr<DataSourceInterface> data_source)
+         std::unique_ptr<DataSourceInterface> data_source,
+         std::unique_ptr<WebMentionManager> webmention_manager)
     : config(conf),
       templates(
           (std::filesystem::path(config.data_dir) / "templates" / "").string()),
       auth(std::move(openid_auth)), data(std::move(data_source)),
       hasher(std::make_unique<mw::SHA256HalfHasher>()),
       attachment_manager(*hasher), post_cache(conf), theme_manager(),
+      webmention_manager(webmention_manager
+                             ? std::move(webmention_manager)
+                             : std::make_unique<WebMentionManager>(*data)),
       base_url(), should_stop(false)
 {
     auto u = mw::URL::fromStr(conf.base_url);
@@ -394,6 +401,10 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     {
         return mw::URL(base_url).appendPath("feed.xml").str();
     }
+    if(name == "webmention")
+    {
+        return mw::URL(base_url).appendPath("webmention").str();
+    }
     return "";
 }
 
@@ -476,11 +487,52 @@ void App::handlePost(const httplib::Request& req, httplib::Response& res)
         return;
     }
 
-    ASSIGN_OR_RESPOND_ERROR(nlohmann::json pj, renderPostToJson(*std::move(p)),
-                            res);
+    auto pj_result = renderPostToJson(*std::move(p));
+    if(!pj_result.has_value())
+    {
+        std::string err_msg = errorMsg(pj_result.error());
+        spdlog::error("RENDER ERROR: {}", err_msg);
+        res.status = 500;
+        res.set_content(err_msg, "text/plain");
+        return;
+    }
+    nlohmann::json pj = std::move(pj_result).value();
+
+    auto wm_result = this->data->getVerifiedWebMentionsForPost(id);
+    if(!wm_result.has_value())
+    {
+        std::string err_msg = errorMsg(wm_result.error());
+        spdlog::error("WM ERROR: {}", err_msg);
+        res.status = 500;
+        res.set_content(err_msg, "text/plain");
+        return;
+    }
+    auto webmentions = std::move(wm_result).value();
+    nlohmann::json wm_json = nlohmann::json::array();
+    for(const auto& m : webmentions)
+    {
+        nlohmann::json mj;
+        mj["source"] = m.source;
+        if(m.author_name.has_value())
+        {
+            mj["author_name"] = *m.author_name;
+        }
+        if(m.author_photo.has_value())
+        {
+            mj["author_photo"] = *m.author_photo;
+        }
+        if(m.content.has_value())
+        {
+            mj["content"] = *m.content;
+        }
+        wm_json.push_back(std::move(mj));
+    }
+
     nlohmann::json data = baseTemplateData(req);
-    data.merge_patch(
-        {{"post", std::move(pj)}, {"session_user", session->user.name}});
+    data.merge_patch({{"post", std::move(pj)},
+                      {"session_user", session->user.name},
+                      {"webmentions", std::move(wm_json)}});
+
     std::string result = templates.render_file("post.html", std::move(data));
     res.status = 200;
     res.set_content(std::move(result), "text/html");
@@ -666,6 +718,15 @@ void App::handleSavePost(const httplib::Request& req,
         res.set_content(errorMsg(value.error()), "text/plain");
         return;
     }
+    std::set<std::string> to_notify;
+    auto old_p = data->getPost(*p.id);
+    if(old_p.has_value() && old_p->has_value())
+    {
+        to_notify = extractLinks(**old_p);
+    }
+
+    std::set<std::string> new_urls = extractLinks(p);
+
     mw::E<void> maybe_error;
     if(value->get<bool>())
     {
@@ -684,6 +745,14 @@ void App::handleSavePost(const httplib::Request& req,
                         "text/plain");
         return;
     }
+
+    to_notify.insert(new_urls.begin(), new_urls.end());
+    if(!to_notify.empty())
+    {
+        webmention_manager->sendWebMentions(
+            urlFor("post", std::to_string(*p.id)), to_notify);
+    }
+
     res.set_redirect(urlFor("post", std::to_string(*p.id)));
 }
 
@@ -720,6 +789,14 @@ void App::handlePublishFromDraft(const httplib::Request& req,
         res.set_content("Failed to publish", "text/plain");
         return;
     }
+
+    std::set<std::string> new_urls = extractLinks(draft);
+    if(!new_urls.empty())
+    {
+        webmention_manager->sendWebMentions(urlFor("post", std::to_string(id)),
+                                            new_urls);
+    }
+
     res.set_redirect(urlFor("post", std::to_string(id)));
 }
 
@@ -1087,6 +1164,9 @@ void App::setup()
     server.Get(getPath("feed"),
                [&](const httplib::Request& req, httplib::Response& res)
                { handleFeed(req, res); });
+    server.Post(getPath("webmention"),
+                [&](const httplib::Request& req, httplib::Response& res)
+                { handleWebMention(req, res); });
 }
 
 nlohmann::json App::baseTemplateData(const httplib::Request& req) const
@@ -1136,4 +1216,75 @@ void App::stop()
 void App::wait()
 {
     server_thread.join();
+}
+
+void App::handleWebMention(const httplib::Request& req, httplib::Response& res)
+{
+    std::string source = req.get_param_value("source");
+    std::string target = req.get_param_value("target");
+
+    if(source.empty() || target.empty() || source == target)
+    {
+        res.status = 400;
+        res.set_content("Bad Request", "text/plain");
+        return;
+    }
+
+    if(!source.starts_with("http://") && !source.starts_with("https://"))
+    {
+        res.status = 400;
+        res.set_content("Bad Request", "text/plain");
+        return;
+    }
+    if(!target.starts_with("http://") && !target.starts_with("https://"))
+    {
+        res.status = 400;
+        res.set_content("Bad Request", "text/plain");
+        return;
+    }
+
+    // Resolve Target
+    auto target_url = mw::URL::fromStr(target);
+    if(!target_url.has_value())
+    {
+        res.status = 400;
+        res.set_content("Bad Request", "text/plain");
+        return;
+    }
+
+    std::string path = target_url->path();
+    std::regex p_regex(R"(/p/([0-9]+))");
+    std::smatch match;
+    if(!std::regex_search(path, match, p_regex))
+    {
+        res.status = 400;
+        res.set_content("Bad Request", "text/plain");
+        return;
+    }
+
+    int64_t target_id = std::stoll(match[1].str());
+
+    auto p = data->getPost(target_id);
+    if(!p.has_value() || !p->has_value())
+    {
+        res.status = 400;
+        res.set_content("Bad Request", "text/plain");
+        return;
+    }
+
+    auto m1_id = data->upsertWebMention(source, target_id);
+    if(!m1_id.has_value())
+    {
+        res.status = 500;
+        res.set_content("Internal Server Error", "text/plain");
+        return;
+    }
+
+    res.status = 202;
+    res.set_content("Mention queued for verification.", "text/plain");
+
+    std::thread(
+        [this, id = *m1_id, source, target]()
+        { this->webmention_manager->verifyWebMention(id, source, target); })
+        .detach();
 }

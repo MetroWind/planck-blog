@@ -147,3 +147,42 @@ TEST(DataSource, CanAddAttachmentReferral)
         EXPECT_EQ(refs, expected);
     }
 }
+
+TEST(DataSource, WebMentionsUpsertAndFetch)
+{
+    ASSIGN_OR_FAIL(std::unique_ptr<DataSourceSqlite> data,
+                   DataSourceSqlite::newFromMemory());
+    Post p;
+    p.markup = Post::COMMONMARK;
+    ASSIGN_OR_FAIL(int64_t post_id, data->saveDraft(std::move(p)));
+
+    // Upsert
+    ASSIGN_OR_FAIL(int64_t m1_id,
+                   data->upsertWebMention("http://source.com", post_id));
+    EXPECT_GT(m1_id, 0);
+
+    // Fetch verified (none yet)
+    ASSIGN_OR_FAIL(auto verified, data->getVerifiedWebMentionsForPost(post_id));
+    EXPECT_TRUE(verified.empty());
+
+    // Update to verified
+    EXPECT_TRUE(isExpected(
+        data->updateWebMention(m1_id, 1, "Alice", std::nullopt, "Hello!")));
+
+    // Fetch again
+    ASSIGN_OR_FAIL(verified, data->getVerifiedWebMentionsForPost(post_id));
+    ASSERT_EQ(verified.size(), 1);
+    EXPECT_EQ(verified[0].source, "http://source.com");
+    EXPECT_EQ(verified[0].author_name.value_or(""), "Alice");
+    EXPECT_EQ(verified[0].content.value_or(""), "Hello!");
+
+    // Upsert again (should update status to 0)
+    EXPECT_TRUE(
+        isExpected(data->upsertWebMention("http://source.com", post_id)));
+
+    ASSIGN_OR_FAIL(verified, data->getVerifiedWebMentionsForPost(post_id));
+    EXPECT_TRUE(verified.empty()); // Status is 0 now
+
+    // Delete
+    EXPECT_TRUE(isExpected(data->deleteWebMention(m1_id)));
+}

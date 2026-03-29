@@ -4,6 +4,7 @@
 #include <format>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -21,6 +22,7 @@
 #include "data.hpp"
 #include "post_rendering.hpp"
 #include "theme.hpp"
+#include "webmention.hpp"
 
 void copyToHttplibReq(const mw::HTTPRequest& src, httplib::Request& dest);
 
@@ -30,7 +32,8 @@ public:
     App() = delete;
     App(const Configuration& conf,
         std::unique_ptr<mw::AuthInterface> openid_auth,
-        std::unique_ptr<DataSourceInterface> data_source);
+        std::unique_ptr<DataSourceInterface> data_source,
+        std::unique_ptr<WebMentionManager> webmention_manager = nullptr);
 
     std::string urlFor(const std::string& name,
                        const std::string& arg = "") const;
@@ -60,6 +63,7 @@ public:
     void handleSelectTheme(const httplib::Request& req,
                            httplib::Response& res) const;
     void handleFeed(const httplib::Request& req, httplib::Response& res);
+    void handleWebMention(const httplib::Request& req, httplib::Response& res);
 
     void start();
     void stop();
@@ -133,6 +137,7 @@ private:
     AttachmentManager attachment_manager;
     PostCache post_cache;
     ThemeManager theme_manager;
+    std::unique_ptr<WebMentionManager> webmention_manager;
     mw::URL base_url;
     nlohmann::json static_template_data;
     std::atomic<bool> should_stop;

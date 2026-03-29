@@ -1,5 +1,6 @@
 #pragma once
 
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -39,3 +40,8 @@ private:
     std::unordered_map<int64_t, TimedRender> cache;
     const Configuration& conf;
 };
+
+// Extracts absolute external links from a post's content.
+// Note: This currently only parses and extracts links from Markdown
+// (COMMONMARK) posts. For ASCIIDOC or other formats, it returns an empty set.
+std::set<std::string> extractLinks(const Post& p);

@@ -24,6 +24,24 @@ TEST(Post, CanRenderAsciiDoc)
 )");
 }
 
+TEST(Post, CanExtractLinks)
+{
+    Post p;
+    p.markup = Post::COMMONMARK;
+    p.raw_content = "Here is a [link](https://example.com) and another "
+                    "[one](http://test.com) and [invalid](/local).";
+    std::set<std::string> links = extractLinks(p);
+    ASSERT_EQ(links.size(), 2);
+    EXPECT_EQ(links.count("http://test.com"), 1);
+    EXPECT_EQ(links.count("https://example.com"), 1);
+
+    Post p2;
+    p2.markup = Post::ASCIIDOC;
+    p2.raw_content = "Here is a [link](https://example.com)";
+    std::set<std::string> links2 = extractLinks(p2);
+    EXPECT_TRUE(links2.empty());
+}
+
 TEST(Post, CanRenderMarkdown)
 {
     Configuration conf;

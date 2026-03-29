@@ -35,6 +35,31 @@
             </div>
             <div id="PostBody">{{ post.content }}</div>
           </article>
+
+          {% if length(webmentions) > 0 %}
+          <section class="webmentions">
+              <h3>WebMentions</h3>
+              <ul class="mention-list">
+                  {% for mention in webmentions %}
+                  <li class="mention-item">
+                      <div class="mention-meta">
+                          {% if existsIn(mention, "author_photo") %}
+                          <img src="{{ mention.author_photo }}" class="mention-avatar" alt="Author photo">
+                          {% endif %}
+                          <span class="mention-author">{{ default(mention.author_name, "Someone") }}</span>
+                          <span class="mention-source">mentioned this on <a href="{{ mention.source }}">{{ mention.source }}</a></span>
+                      </div>
+                      {% if existsIn(mention, "content") %}
+                      <blockquote class="mention-snippet">
+                          {{ mention.content }}
+                      </blockquote>
+                      {% endif %}
+                  </li>
+                  {% endfor %}
+              </ul>
+          </section>
+          {% endif %}
+
           <hr/>
           <div id="AfterPost">
             {{ after_post }}

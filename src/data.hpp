@@ -15,7 +15,19 @@
 #include "attachment.hpp"
 #include "post.hpp"
 
-constexpr int64_t DB_SCHEMA_VERSION = 1;
+constexpr int64_t DB_SCHEMA_VERSION = 2;
+
+struct WebMention
+{
+    int64_t id;
+    std::string source;
+    int64_t target_id;
+    int status; // 0=pending, 1=verified, 2=rejected
+    std::optional<std::string> author_name;
+    std::optional<std::string> author_photo;
+    std::optional<std::string> content;
+    int64_t created_at;
+};
 
 class DataSourceInterface
 {
@@ -28,6 +40,8 @@ public:
     // this number by 1, manually, by hand. The intended use is to
     // help with database migration.
     virtual mw::E<int64_t> getSchemaVersion() const = 0;
+
+    virtual mw::E<void> schemaMigrate1To2() const = 0;
 
     // Get all published posts, newest first.
     virtual mw::E<std::vector<Post>> getPosts() const = 0;
@@ -94,6 +108,17 @@ public:
     // Get the time of the latest update (or publish).
     virtual mw::E<mw::Time> getLatestUpdateTime() const = 0;
 
+    virtual mw::E<int64_t> upsertWebMention(const std::string& source,
+                                            int64_t target_id) const = 0;
+    virtual mw::E<void>
+    updateWebMention(int64_t id, int status,
+                     std::optional<std::string> author_name,
+                     std::optional<std::string> author_photo,
+                     std::optional<std::string> content) const = 0;
+    virtual mw::E<void> deleteWebMention(int64_t id) const = 0;
+    virtual mw::E<std::vector<WebMention>>
+    getVerifiedWebMentionsForPost(int64_t postId) const = 0;
+
 protected:
     virtual mw::E<void> setSchemaVersion(int64_t v) const = 0;
 };
@@ -117,6 +142,8 @@ public:
     // We use the user_version pragma for the schema version. In
     // mw::SQLite this is only 32 bits.
     mw::E<int64_t> getSchemaVersion() const override;
+
+    mw::E<void> schemaMigrate1To2() const override;
 
     mw::E<std::vector<Post>> getPosts() const override;
     mw::E<std::vector<Post>> getPosts(int start, int count) const override;
@@ -145,6 +172,17 @@ public:
                          nlohmann::json&& value) const override;
 
     mw::E<mw::Time> getLatestUpdateTime() const override;
+
+    mw::E<int64_t> upsertWebMention(const std::string& source,
+                                    int64_t target_id) const override;
+    mw::E<void>
+    updateWebMention(int64_t id, int status,
+                     std::optional<std::string> author_name,
+                     std::optional<std::string> author_photo,
+                     std::optional<std::string> content) const override;
+    mw::E<void> deleteWebMention(int64_t id) const override;
+    mw::E<std::vector<WebMention>>
+    getVerifiedWebMentionsForPost(int64_t postId) const override;
 
     // Do not use.
     DataSourceSqlite() = default;

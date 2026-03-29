@@ -77,7 +77,6 @@ DataSourceSqlite::fromFile(const std::string& db_file)
 {
     auto data_source = std::make_unique<DataSourceSqlite>();
     ASSIGN_OR_RETURN(data_source->db, mw::SQLite::connectFile(db_file));
-    DO_OR_RETURN(data_source->setSchemaVersion(DB_SCHEMA_VERSION));
     DO_OR_RETURN(data_source->db->execute(
         "CREATE TABLE IF NOT EXISTS Posts "
         "(id INTEGER PRIMARY KEY AUTOINCREMENT, markup INTEGER, title TEXT,"
@@ -95,6 +94,29 @@ DataSourceSqlite::fromFile(const std::string& db_file)
     DO_OR_RETURN(
         data_source->db->execute("CREATE TABLE IF NOT EXISTS KeyValues "
                                  "(key TEXT PRIMARY KEY, value TEXT);"));
+    DO_OR_RETURN(data_source->db->execute(
+        "CREATE TABLE IF NOT EXISTS WebMentions ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "source TEXT NOT NULL, "
+        "target_id INTEGER NOT NULL, "
+        "status INTEGER NOT NULL, "
+        "author_name TEXT, "
+        "author_photo TEXT, "
+        "content TEXT, "
+        "created_at INTEGER NOT NULL, "
+        "FOREIGN KEY (target_id) REFERENCES Posts(id) ON DELETE CASCADE, "
+        "UNIQUE(source, target_id));"));
+    DO_OR_RETURN(data_source->db->execute(
+        "CREATE INDEX IF NOT EXISTS idx_webmentions_target_status ON "
+        "WebMentions(target_id, status);"));
+
+    ASSIGN_OR_RETURN(int64_t current_version, data_source->getSchemaVersion());
+    if(current_version == 1)
+    {
+        DO_OR_RETURN(data_source->schemaMigrate1To2());
+    }
+    DO_OR_RETURN(data_source->setSchemaVersion(DB_SCHEMA_VERSION));
+
     return data_source;
 }
 
@@ -545,4 +567,83 @@ mw::E<mw::Time> DataSourceSqlite::getLatestUpdateTime() const
         }
     }
     return mw::secondsToTime(max_time);
+}
+
+mw::E<void> DataSourceSqlite::schemaMigrate1To2() const
+{
+    // The WebMentions table will be created in fromFile anyway,
+    // but we can put any specific schema update logic here if we needed to.
+    return {};
+}
+
+mw::E<int64_t> DataSourceSqlite::upsertWebMention(const std::string& source,
+                                                  int64_t target_id) const
+{
+    ASSIGN_OR_RETURN(
+        auto sql,
+        db->statementFromStr(
+            "INSERT INTO WebMentions (source, target_id, status, created_at) "
+            "VALUES (?, ?, 0, ?) ON CONFLICT(source, target_id) DO UPDATE SET "
+            "status = 0;"));
+    DO_OR_RETURN(
+        sql.bind(source, target_id, mw::timeToSeconds(mw::Clock::now())));
+    DO_OR_RETURN(db->execute(std::move(sql)));
+    return db->lastInsertRowID();
+}
+
+mw::E<void>
+DataSourceSqlite::updateWebMention(int64_t id, int status,
+                                   std::optional<std::string> author_name,
+                                   std::optional<std::string> author_photo,
+                                   std::optional<std::string> content) const
+{
+    ASSIGN_OR_RETURN(
+        auto sql,
+        db->statementFromStr("UPDATE WebMentions SET status = ?, author_name = "
+                             "?, author_photo = ?, content = ? WHERE id = ?;"));
+    DO_OR_RETURN(sql.bind(status, author_name, author_photo, content, id));
+    DO_OR_RETURN(db->execute(std::move(sql)));
+    return {};
+}
+
+mw::E<void> DataSourceSqlite::deleteWebMention(int64_t id) const
+{
+    ASSIGN_OR_RETURN(auto sql, db->statementFromStr(
+                                   "DELETE FROM WebMentions WHERE id = ?;"));
+    DO_OR_RETURN(sql.bind(id));
+    DO_OR_RETURN(db->execute(std::move(sql)));
+    return {};
+}
+
+mw::E<std::vector<WebMention>>
+DataSourceSqlite::getVerifiedWebMentionsForPost(int64_t postId) const
+{
+    ASSIGN_OR_RETURN(
+        auto sql,
+        db->statementFromStr("SELECT id, source, target_id, status, "
+                             "author_name, author_photo, content, created_at "
+                             "FROM WebMentions WHERE target_id = ? AND status "
+                             "= 1 ORDER BY created_at ASC;"));
+    DO_OR_RETURN(sql.bind(postId));
+    ASSIGN_OR_RETURN(
+        auto rows,
+        (db->eval<int64_t, std::string, int64_t, int,
+                  std::optional<std::string>, std::optional<std::string>,
+                  std::optional<std::string>, int64_t>(std::move(sql))));
+    std::vector<WebMention> mentions;
+    mentions.reserve(rows.size());
+    for(auto& row : rows)
+    {
+        WebMention m;
+        m.id = std::get<0>(row);
+        m.source = std::move(std::get<1>(row));
+        m.target_id = std::get<2>(row);
+        m.status = std::get<3>(row);
+        m.author_name = std::move(std::get<4>(row));
+        m.author_photo = std::move(std::get<5>(row));
+        m.content = std::move(std::get<6>(row));
+        m.created_at = std::get<7>(row);
+        mentions.push_back(std::move(m));
+    }
+    return mentions;
 }

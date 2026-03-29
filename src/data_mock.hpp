@@ -54,6 +54,18 @@ public:
                 (const std::string& key, nlohmann::json&& value),
                 (const override));
     MOCK_METHOD(mw::E<mw::Time>, getLatestUpdateTime, (), (const override));
+    MOCK_METHOD(mw::E<void>, schemaMigrate1To2, (), (const override));
+    MOCK_METHOD(mw::E<int64_t>, upsertWebMention,
+                (const std::string& source, int64_t target_id),
+                (const override));
+    MOCK_METHOD(mw::E<void>, updateWebMention,
+                (int64_t id, int status, std::optional<std::string> author_name,
+                 std::optional<std::string> author_photo,
+                 std::optional<std::string> content),
+                (const override));
+    MOCK_METHOD(mw::E<void>, deleteWebMention, (int64_t id), (const override));
+    MOCK_METHOD(mw::E<std::vector<WebMention>>, getVerifiedWebMentionsForPost,
+                (int64_t postId), (const override));
 
 protected:
     mw::E<void> setSchemaVersion([[maybe_unused]] int64_t v) const override

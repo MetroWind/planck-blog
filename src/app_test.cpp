@@ -14,6 +14,7 @@
 #include "attachment.hpp"
 #include "config.hpp"
 #include "data_mock.hpp"
+#include "webmention.hpp"
 
 using ::testing::HasSubstr;
 using ::testing::Return;
@@ -263,6 +264,10 @@ TEST_F(UserAppTest, CanHandlePost)
     p.id = 1;
 
     EXPECT_CALL(*data_source, getPost(1)).WillOnce(Return(p));
+    EXPECT_CALL(*data_source, getVerifiedWebMentionsForPost(testing::_))
+        .WillRepeatedly(Return(std::vector<WebMention>()));
+    EXPECT_CALL(*data_source, getValue("pause-update-time"))
+        .WillRepeatedly(Return(std::nullopt));
 
     app->start();
     {

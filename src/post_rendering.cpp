@@ -51,6 +51,43 @@ mw::E<std::string> renderAsciiDoc(const std::string& src)
 
 } // namespace
 
+std::set<std::string> extractLinks(const Post& p)
+{
+    std::set<std::string> links;
+
+    if(p.markup != Post::COMMONMARK)
+    {
+        return links;
+    }
+
+    macrodown::MacroDown md;
+    auto ast = md.parse(p.raw_content);
+    if(!ast)
+    {
+        return links;
+    }
+
+    ast->forEach(
+        [&links, &md](const macrodown::Node& node)
+        {
+            if(std::holds_alternative<macrodown::Macro>(node.data))
+            {
+                const auto& m = std::get<macrodown::Macro>(node.data);
+                if(m.name == "link" && !m.arguments.empty())
+                {
+                    std::string url = md.evaluator().evaluate(*m.arguments[0]);
+                    if(url.starts_with("http://") ||
+                       url.starts_with("https://"))
+                    {
+                        links.insert(url);
+                    }
+                }
+            }
+        });
+
+    return links;
+}
+
 mw::E<std::string> renderPost(const Post& p,
                               [[maybe_unused]] const Configuration& conf)
 {
