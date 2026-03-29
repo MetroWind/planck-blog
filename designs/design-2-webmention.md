@@ -8,20 +8,20 @@ The audience for this document is an inexperienced intern. Every concept, data s
 
 ## 2. Architecture & Data Flow Overview
 
-WebMention consists of two completely independent subsystems:
+WebMention consists of two completely independent subsystems. Crucially, the protocol is **idempotent**, meaning notifications can be sent multiple times for updates and deletions, and our system must handle them gracefully.
 
 ### 2.1 Inbound Data Flow (Receiving)
 1. **Discovery**: A remote author publishes a post linking to our blog. Their server discovers our WebMention endpoint (`/webmention`) from our post's `<link>` tags.
 2. **Notification**: Their server sends a `POST /webmention` containing `source` (their post) and `target` (our post).
-3. **Queueing**: Our server validates the `target` URL, maps it to an internal Post ID, inserts a `pending` record into our database, and returns `202 Accepted`.
-4. **Verification (Background)**: A background thread downloads the `source` URL (with a strict size limit), verifies our `target` link exists inside it, extracts a text snippet, and updates the database to `verified`.
+3. **Queueing**: Our server validates the `target` URL, maps it to an internal Post ID, performs an **upsert** (insert or update to `pending`) into our database, and returns `202 Accepted`. This handles both new mentions and updates/deletions from the remote author.
+4. **Verification (Background)**: A background thread downloads the `source` URL (following HTTP redirects, with a strict size limit). It verifies our `target` link exists inside it, extracts a text snippet, and updates the database to `verified`. If the source returns `404 Not Found`, `410 Gone`, or the link is no longer present, the mention is deleted from our database.
 5. **Display**: When a user visits our post, the template engine queries verified mentions for that Post ID and renders them at the bottom of the page.
 
 ### 2.2 Outbound Data Flow (Sending)
-1. **Trigger**: The blog owner clicks "Publish" or "Save" on a Markdown post.
-2. **Extraction**: The server parses the Markdown AST using `MacroDown` and extracts all external URLs.
-3. **Discovery (Background)**: For each URL, a background thread fetches the remote page to find its WebMention endpoint.
-4. **Notification**: Our server sends a `POST` request to the discovered endpoint with `source` (our post) and `target` (the external link).
+1. **Trigger**: The blog owner clicks "Publish", "Save", or "Delete" on a Markdown post.
+2. **Extraction & Diffing**: The server parses the Markdown AST using `MacroDown` and extracts all external URLs. It compares these with the previously saved URLs for this post to find added and removed links.
+3. **Discovery (Background)**: For each affected URL (added, kept, or removed), a background thread fetches the remote page to find its WebMention endpoint following strict fallback rules.
+4. **Notification**: Our server sends a `POST` request to the discovered endpoint with `source` (our post) and `target` (the external link), correctly preserving query parameters.
 
 ## 3. Data Model
 
@@ -35,20 +35,32 @@ CREATE TABLE IF NOT EXISTS WebMentions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source TEXT NOT NULL,          -- The URL of the page that linked to us
     target_id INTEGER NOT NULL,    -- The ID of the blog post being linked to
-    status TEXT NOT NULL,          -- 'pending', 'verified', 'rejected'
+    status INTEGER NOT NULL,       -- 0: pending, 1: verified, 2: rejected
     author_name TEXT,              -- Name extracted from the source page
     author_photo TEXT,             -- Avatar URL extracted from the source page
     content TEXT,                  -- A plain-text snippet of the mention
     created_at INTEGER NOT NULL,   -- Unix timestamp when the mention was received
-    FOREIGN KEY (target_id) REFERENCES Posts(id) ON DELETE CASCADE
+    FOREIGN KEY (target_id) REFERENCES Posts(id) ON DELETE CASCADE,
+    UNIQUE(source, target_id)      -- Enforce idempotency for upserts
 );
+
+CREATE INDEX IF NOT EXISTS idx_webmentions_target_status ON WebMentions(target_id, status);
 ```
 
 **Implementation Details:**
-*   `content`: This will store a *snippet*, not the full content of the source page. This prevents our database from growing infinitely if someone writes a "one billion word" post linking to us.
+*   `UNIQUE(source, target_id)`: Allows us to perform `INSERT ... ON CONFLICT DO UPDATE` to handle idempotent updates from senders.
+*   `status`: Using an integer `0=pending, 1=verified, 2=rejected` is highly efficient for the index.
+*   `content`: This will store a *snippet*, not the full content of the source page to prevent unbound database growth.
 *   `FOREIGN KEY`: The `ON DELETE CASCADE` rule ensures that if a post is deleted, all associated WebMentions are automatically deleted by SQLite.
 
-### 3.2 C++ Data Structures
+### 3.2 Database Schema Version Migration
+Because this design changes the database schema, we must manage the migration gracefully:
+1.  **Bump Version**: Update the database schema version constant (e.g., `DB_SCHEMA_VERSION`) to `2`.
+2.  **Define Migration Interface**: Define a new virtual function `mw::E<void> schemaMigrate1To2()` in `DataSourceInterface`.
+3.  **Implement Migration Function**: Implement `schemaMigrate1To2()` in all implementing classes (e.g., `DataSourceSqlite`, and any mock data sources). Even though `CREATE TABLE IF NOT EXISTS WebMentions` handles the actual creation of the new table when the database is initialized, this function must be defined to maintain the structural pattern. It can have an empty implementation.
+4.  **Execute Migration**: In `DataSourceSqlite::fromFile()`, add an `if` statement to check if the current schema version of the loaded database is `1`. If it is `1`, call `schemaMigrate1To2()` and update the database version to `2`.
+
+### 3.3 C++ Data Structures
 In `src/data.hpp`, define the corresponding C++ struct:
 
 ```cpp
@@ -56,7 +68,7 @@ struct WebMention {
     int64_t id;
     std::string source;
     int64_t target_id;
-    std::string status;
+    int status; // 0=pending, 1=verified, 2=rejected
     std::optional<std::string> author_name;
     std::optional<std::string> author_photo;
     std::optional<std::string> content;
@@ -65,8 +77,9 @@ struct WebMention {
 ```
 
 Add these virtual methods to `DataSourceInterface` and implement them in `DataSourceSqlite`:
-*   `mw::E<int64_t> insertWebMention(const WebMention& mention)`: Inserts a pending mention and returns its new ID.
-*   `mw::E<void> updateWebMention(int64_t id, const std::string& status, std::optional<std::string> author_name, std::optional<std::string> author_photo, std::optional<std::string> content)`: Updates a mention after verification.
+*   `mw::E<int64_t> upsertWebMention(const std::string& source, int64_t target_id)`: Inserts a pending mention or updates an existing one to pending status, and returns its ID.
+*   `mw::E<void> updateWebMention(int64_t id, int status, std::optional<std::string> author_name, std::optional<std::string> author_photo, std::optional<std::string> content)`: Updates a mention after verification.
+*   `mw::E<void> deleteWebMention(int64_t id)`: Deletes a mention (used when a remote link is removed or returns 410).
 *   `mw::E<std::vector<WebMention>> getVerifiedWebMentionsForPost(int64_t postId) const`: Retrieves verified mentions, ordered by `created_at` ascending.
 
 ## 4. Receiving WebMentions (Inbound)
@@ -90,11 +103,11 @@ server.Post(getPath("webmention"), [&](const httplib::Request& req, httplib::Res
 2.  **Initial Validation**:
     *   If `source` or `target` are empty, return HTTP `400 Bad Request`.
     *   If `source` equals `target`, return HTTP `400 Bad Request`.
+    *   **URL Scheme Validation**: Verify both URLs start with `http://` or `https://`. Reject others with `400 Bad Request`.
 3.  **Resolve Target**: Parse the `target` URL to extract the post ID. Our post URLs follow the pattern `/p/:id`.
-    *   Extract the path from the `target` URL.
-    *   Use regex or string manipulation to verify it starts with `/p/` and ends with an integer.
-    *   If it does not match, or the post ID doesn't exist in the database, return HTTP `400 Bad Request`.
-4.  **Store as Pending**: Populate a `WebMention` struct with `target_id`, `source`, `status = "pending"`, and the current timestamp. Call `insertWebMention`.
+    *   Extract the path from the `target` URL (ignoring fragment identifiers like `#comments`).
+    *   If it does not match our routing, or the post ID doesn't exist in the database, return HTTP `400 Bad Request`.
+4.  **Store as Pending (Upsert)**: Call `upsertWebMention`. This correctly handles both new mentions and update notifications from the sender, placing the record back into the `pending` queue.
 5.  **Acknowledge**: Respond immediately with HTTP `202 Accepted` and a body of `Mention queued for verification.`.
 6.  **Trigger Asynchronous Verification**: Dispatch a background task (e.g., `std::thread([this, id]() { verifyWebMention(id); }).detach();`).
 
@@ -103,16 +116,20 @@ This is the most complex part of receiving. We must defensively download and par
 
 **Worker Logic (`App::verifyWebMention(int64_t mention_id)`):**
 1.  **Fetch Mention Record**: Load the pending `WebMention` from the database.
-2.  **Fetch Source Safely**: Make an HTTP GET request to the `source` URL using `httplib::Client`.
-    *   *Timeout Constraint*: Set a strict timeout of 5 seconds.
-    *   *Size Constraint*: To prevent memory exhaustion (the "one billion words" problem), we must set a `Content-Length` limit or use a chunked reader that aborts after downloading **1 Megabyte** of data. If the link isn't in the first 1MB, we reject the mention.
-3.  **Verify Link Presence**: Convert the downloaded payload to a string. Search the string for the exact `target` URL.
-    *   If the URL is not found, update the database status to `rejected` and exit.
-4.  **Snippet Extraction Logic (using `tidy-html5`)**:
-    Since we cannot safely display arbitrary HTML, we will extract an HTML snippet and use [`tidy-html5`](https://github.com/htacg/tidy-html5) to sanitize it.
+2.  **Fetch Source Safely**: Make an HTTP GET request to the `source` URL using `mw::HTTPSession`.
+    *   *Redirects Constraint*: `mw::HTTPSession` (or `mw::HTTPRequest`) must be extended to support following redirects (up to 20 hops) to meet the WebMention spec.
+    *   *Timeout Constraint*: A strict timeout of 5 seconds must be enforced (this also requires an extension to the `mw::HTTPSession` interface).
+    *   *Size Constraint*: Abort after downloading **1 Megabyte** of data to prevent memory exhaustion. (This will likely require a callback-based approach in `HTTPSession`).
+3.  **Handle Deletions & Missing Links**:
+    *   If the fetch returns HTTP `404 Not Found` or `410 Gone` (checked via `res->status`), the source post was deleted. Call `deleteWebMention(mention.id)` and exit.
+    *   Convert the downloaded payload to a string (using `res->payloadAsStr()`). Search the string for the exact `target` URL.
+    *   If the exact URL is not found (meaning the author updated the post and removed the link), call `deleteWebMention(mention.id)` and exit.
+4.  **Snippet Extraction Logic**:
+    *   **Media Type Check**: Inspect the `Content-Type` header of the HTTP response. If the response is `text/plain` or `application/json`, extract a simple substring around the target URL, HTML-escape it, and save it. **Do not** pass non-HTML content to `tidy-html5`.
+    *   **HTML Sanitization (using `tidy-html5`)**: If the content is `text/html`, we use `tidy-html5`.
 
     *   **Dependency Addition**: Add `tidy-html5` to the project via CMake `FetchContent` in `CMakeLists.txt`.
-    *   **C++ Wrapper (`HtmlSanitizer`)**: Because `tidy-html5` uses a C API (`<tidy.h>`), we will build an RAII C++ wrapper to manage memory securely and expose a clean interface. Create `src/html_sanitizer.hpp`:
+    *   **C++ Wrapper (`HtmlSanitizer`)**: Because `tidy-html5` uses a C API (`<tidy.h>`), we will build an RAII C++ wrapper to manage memory securely. Create `src/html_sanitizer.hpp`:
 
     ```cpp
     #pragma once
@@ -123,8 +140,7 @@ This is the most complex part of receiving. We must defensively download and par
     {
     public:
         // Parses `raw_html`, removes unsafe tags/attributes, locates the <a>
-        // tag linking to `target_url`, and returns a balanced HTML snippet
-        // surrounding the link.
+        // tag linking to `target_url`, and returns a balanced HTML snippet.
         static std::optional<std::string> extractAndSanitizeSnippet(
             const std::string& raw_html,
             const std::string& target_url,
@@ -133,30 +149,24 @@ This is the most complex part of receiving. We must defensively download and par
     ```
 
     *   **Implementation Steps (`src/html_sanitizer.cpp`)**:
-        1. **RAII Management**: Create a scoped guard (or use `std::unique_ptr` with a custom deleter) for `TidyDoc tdoc = tidyCreate();` to ensure `tidyRelease(tdoc)` is always called.
-        2. **Configuration**:
-           * `tidyOptSetBool(tdoc, TidyForceOutput, yes)` to ensure it yields output even on errors.
-           * `tidyOptSetBool(tdoc, TidyShowBodyOnly, yes)` to output just the fragment.
-           * `tidyOptSetBool(tdoc, TidyMark, no)` to disable meta tags.
-        3. **Parsing**: Call `tidyParseString(tdoc, raw_html.c_str());` followed by `tidyCleanAndRepair(tdoc);` to build the DOM.
-        4. **AST Sanitization Pass**: Write a recursive function that takes a `TidyNode`.
-           * If it is a dangerous tag (`script`, `style`, `iframe`, `object`, `applet`, `form`), remove it using Tidy's node manipulation functions (if available) or skip it during serialization.
-           * Iterate over the node's attributes (`tidyAttrFirst`, `tidyAttrNext`). If the attribute name starts with `on` (like `onclick`) or represents a dangerous protocol (e.g., `javascript:` in an `href`), strip it.
-        5. **AST Search Pass**: Write a recursive function to find a `TidyNode` representing an `<a>` tag whose `href` attribute equals `target_url`.
-        6. **Context Bounding**: Once the target link node is found, traverse upwards using `tidyGetParent(node)` until you hit a block-level boundary like `<p>`, `<li>`, `<blockquote>`, or `<div>`. This becomes the root of our snippet.
-        7. **Serialization**: Use a `TidyBuffer` and `tidySaveBuffer` (if saving the whole doc) or write a custom recursive loop to serialize the `TidyNode` sub-tree into a `std::string`. If using a custom loop, you can enforce the `max_length` by ceasing to append text node contents once the limit is reached, while still emitting the proper closing tags (e.g., `</a></p>`) to guarantee the result is perfectly balanced HTML.
-5.  **Microformats2 (Optional/Best-Effort)**:
-    If you wish to extract `author_name` and `author_photo`, look for standard Microformats classes like `class="p-author"` or `class="u-photo"` near the snippet. If not found, these fields remain `null`.
-6.  **Update Database**: Update the record to `status = "verified"` and save the `content` (the sanitized HTML snippet) and author details.
+        1. **RAII Management**: Create a scoped guard for `TidyDoc tdoc = tidyCreate();`.
+        2. **Configuration**: Set `TidyForceOutput, yes`, `TidyShowBodyOnly, yes`, and `TidyMark, no`.
+        3. **Parsing**: Call `tidyParseString(tdoc, raw_html.c_str());` followed by `tidyCleanAndRepair(tdoc);`.
+        4. **AST Sanitization Pass**: Recursively remove dangerous tags (`script`, `style`, `iframe`, `object`, `applet`, `form`) and strip unsafe attributes (`onclick`, `javascript:` protocols).
+        5. **AST Search Pass**: Recursively find a `TidyNode` representing an `<a>` tag whose `href` attribute equals `target_url`.
+        6. **Context Bounding**: Traverse upwards to a block-level boundary (`<p>`, `<li>`, `<blockquote>`, `<div>`). This becomes the root of our snippet.
+        7. **Serialization**: Use a `TidyBuffer` or a custom loop to serialize the `TidyNode` sub-tree up to `max_length`, ensuring perfectly balanced closing HTML tags.
+5.  **Microformats2 (Optional/Best-Effort)**: Extract `author_name` and `author_photo` looking for `class="p-author"` or `class="u-photo"`.
+6.  **Update Database**: Update the record to `status = 1` (verified) and save the `content` and author details.
 
 ### 4.4 Displaying WebMentions on the Post Page
-Mentions should appear below the post content, similar to a comments section.
+Mentions should appear below the post content.
 
 **Step-by-step logic:**
-1.  In `src/app.cpp` within `App::handlePost`, after successfully fetching the `Post` from the database, call `data->getVerifiedWebMentionsForPost(*p.id)`.
+1.  In `src/app.cpp` within `App::handlePost`, call `data->getVerifiedWebMentionsForPost(*p.id)`.
 2.  Convert this `std::vector<WebMention>` into a JSON array.
-3.  Pass this JSON array into the `inja` template data context under the key `webmentions`.
-4.  Update `templates/post.html` to render them.
+3.  Pass this array to the `inja` template data context under `webmentions`.
+4.  Update `templates/post.html` to render them safely.
 
 **Template Structure (`templates/post.html`):**
 ```html
@@ -184,54 +194,69 @@ Mentions should appear below the post content, similar to a comments section.
 </section>
 {% endif %}
 ```
-*Note: We use the `| safe` filter for `mention.content` because we trust the `tidy-html5` sanitization output. CSS should be added to the themes (e.g., `themes/generic/1-styles.css`) to style `.mention-list` with appropriate padding and avatar sizing (e.g., 32x32px).*
 
 ## 5. Sending WebMentions (Outbound)
 
-When we write a post, we notify the sites we linked to. This process must not block the user from saving the post.
+When we write, edit, or delete a post, we must notify the sites we interacted with.
 
-### 5.1 Trigger Points
-In `src/app.cpp`, locate `handleSavePost` and `handlePublishFromDraft`.
-When the post is saved/published to the database successfully, check if the `post.markup` is `Post::Markup::Markdown`.
-If so, dispatch a background thread: `std::thread([this, post]() { sendWebMentions(post); }).detach();`.
+### 5.1 Trigger Points & Diffing
+In `src/app.cpp`, locate where posts are saved, published, or deleted.
+When a post is modified or deleted, we must compute a diff of the links. The W3C spec states we SHOULD notify endpoints even when we remove a link (so they can delete the mention).
+
+1. Retrieve the *previous* raw content of the post (if it existed) and extract its outgoing absolute URLs.
+2. Extract the *new* outgoing absolute URLs from the updated content.
+3. Compute the union of these two sets (links added, links kept, and links removed).
+4. If the post is being completely **deleted**, its URL will begin returning `410 Gone`. We must send WebMentions to *all* URLs it previously linked to so remote servers can update.
+5. Dispatch a background thread passing the source URL and the list of target URLs to process.
 
 ### 5.2 Extracting Links via MacroDown AST
-Because `MacroDown` provides a structured syntax tree (AST), we can reliably identify outgoing links without fragile HTML or regex parsing.
-
 1.  Initialize the `macrodown::MacroDown` engine.
-2.  Parse `post.raw_content` to generate an AST document node.
-3.  Write a recursive AST visitor function that traverses the tree looking for nodes of type `macrodown::Link`.
-4.  For every `macrodown::Link` node found, extract its destination URL.
-5.  Filter out relative links (e.g., `/p/4`), keeping only absolute URLs starting with `http://` or `https://`.
-6.  Remove duplicate URLs from the list.
+2.  Parse `raw_content` to generate an AST document node.
+3.  Write a recursive AST visitor function looking for nodes of type `macrodown::Link`.
+4.  Extract the destination URL, keeping only absolute URLs starting with `http://` or `https://`.
+5.  Remove duplicate URLs from the list.
 
 ### 5.3 Endpoint Discovery & Notification
-For each unique absolute URL extracted:
-1.  **Discover**: Make an HTTP GET request to the URL.
-2.  Look for the `Link` header: `Link: <https://endpoint.com/wm>; rel="webmention"`.
-3.  If not found in the header, parse the first 50KB of the HTML body looking for `<link rel="webmention" href="...">`.
-4.  **Send Payload**: If an endpoint is discovered, make an HTTP POST request to that endpoint:
-    *   Content-Type: `application/x-www-form-urlencoded`
-    *   Body: `source=URL_OF_OUR_POST&target=URL_WE_LINKED_TO` (Make sure to URL-encode both parameters).
-5.  **Logging**: Log the result (success or failure) using `spdlog::info` or `spdlog::warn`.
+To pass the rigorous discovery tests on [webmention.rocks](https://webmention.rocks/), our endpoint discovery must be extremely robust. Naive regex or substring searches will fail.
+
+For each URL in our calculated set:
+1.  **Discover & Follow Redirects**: Make an HTTP GET request to the URL using `mw::HTTPSession` with redirect following enabled (max 20 hops). *Crucially, record the **final** resolved URL after all redirects, as relative endpoints must be resolved against this final URL, not the original URL.*
+2.  **Fallback Precedence & Parsing**: Look for the WebMention endpoint in this exact order. **You must parse these structures properly, not just use `str::find`**:
+    1.  **HTTP `Link` Header**:
+        *   Parse all `Link` headers from `res->header` (there may be multiple comma-separated values).
+        *   Match the `rel` attribute exactly as `webmention`. It may be unquoted (`rel=webmention`), quoted (`rel="webmention"`), mixed case (`REL="WebMention"`), or part of a space-separated list (`rel="webmention alternate"`).
+        *   Reject partial matches like `rel="webmention-endpoint"`.
+    2.  **HTML `<link>` and `<a>` elements (Parsed via `tidy-html5`)**:
+        *   If the header isn't found, parse the HTML body using our `tidy-html5` wrapper to generate an AST. **Do not use regex on the raw HTML**, as webmention.rocks tests hide fake endpoints in HTML comments (`<!-- <link rel="webmention"...> -->`) and escaped text (`&lt;link...`).
+        *   Traverse the AST looking for `<link>` or `<a>` nodes where the `rel` attribute contains the exact token `webmention` (space-separated).
+        *   The first element in document order wins (i.e., if a `<link>` appears before an `<a>`, use the `<link>`).
+        *   Ignore elements missing the `href` attribute. If `href` is present but empty (`href=""`), it means the endpoint is the page itself.
+3.  **URL Resolution**: The discovered endpoint might be a relative URL (e.g., `/webmention`, `../wm`, or `?endpoint=1`). You **MUST** resolve this relative to the **final redirected target URL** to form an absolute endpoint URL.
+4.  **Send Payload**: If an endpoint is discovered, make an HTTP POST request using `mw::HTTPSession::post`:
+    *   Construct a `mw::HTTPRequest` and call `setPayload` with `source=URL_OF_OUR_POST&target=URL_WE_LINKED_TO` (URL-encoded).
+    *   **Query Parameters Preserved:** If the discovered endpoint URL already contains query parameters (e.g., `https://api.example.com/wm?token=123`), they MUST remain in the URL during the POST request and **must not** be moved into the POST body.
+5.  **Logging**: Log the result using `spdlog`.
 
 ## 6. Error Handling & Edge Cases
 
-*   **Self-Denial of Service (Inbound)**: To prevent an attacker from exhausting our background threads by sending thousands of mentions, implement a basic queue or limit the number of active `std::thread` verifications.
+*   **Self-Denial of Service (Inbound)**: Limit the number of active `std::thread` verifications or use a worker queue.
 *   **SSRF (Server-Side Request Forgery)**: A malicious sender might send a `source` URL pointing to an internal network IP (e.g., `http://192.168.1.5/admin`). When our background verification thread fetches it, it might trigger internal actions.
-    *   *Mitigation*: Before fetching the `source`, parse the hostname. If it resolves to a private IP space (e.g., `127.0.0.0/8`, `10.0.0.0/8`, `192.168.0.0/16`), abort the verification and mark it `rejected`.
+    *   *Mitigation*: Before fetching the `source`, parse the hostname. If it resolves to a private IP space or `localhost` (e.g., `127.0.0.0/8`, `10.0.0.0/8`, `192.168.0.0/16`), abort the verification and mark it `rejected`.
 *   **Infinite WebMention Loops**: Two blogs maliciously or accidentally sending WebMentions to each other endlessly.
     *   *Mitigation*: Outbound mentions are strictly tied to a user action (saving/publishing a post in the UI). They are never triggered autonomously by incoming requests.
 
 ## 7. Testing Strategy
 
 1.  **Database Tests** (`src/data_test.cpp`):
-    *   Test `insertWebMention` and ensure `id` increments.
-    *   Test `updateWebMention`.
-    *   Test cascading deletes: insert a Post, insert a WebMention for it, delete the Post, verify the WebMention is gone.
+    *   Test `upsertWebMention` ensures idempotency (no duplicate rows for the same source/target).
+    *   Test cascading deletes when a Post is deleted.
 2.  **Snippet Extraction Tests**:
-    *   Write a unit test with mock HTML strings containing links. Verify the `tidy-html5` C++ wrapper correctly removes `<script>` tags, strips dangerous attributes like `onclick`, successfully balances broken tags, and safely truncates the DOM portion around the target link to the maximum length.
-3.  **MacroDown AST Tests**:
-    *   Write a unit test passing Markdown with inline links, reference links, and plain text. Verify the AST traversal accurately returns only the absolute URLs.
+    *   Verify `tidy-html5` C++ wrapper safely sanitizes dangerous tags/attributes.
+    *   Verify plaintext fallback logic when `Content-Type` is not HTML.
+3.  **MacroDown AST & Diff Tests**:
+    *   Test AST extraction of absolute URLs.
+    *   Test diffing logic (added, kept, removed links).
 4.  **Endpoint Mock Tests** (`src/app_test.cpp`):
-    *   Mock the `httplib::Client` to test the inbound `/webmention` routing logic and ensure a `202 Accepted` is returned for valid payloads.
+    *   Mock `mw::HTTPSession` (using `mw::HTTPSessionInterface`) to test the inbound `/webmention` routing, ensuring synchronous validations (scheme, empty body, same source/target) return `400 Bad Request`.
+    *   Test relative URL resolution during discovery.
+    *   **Discovery Parser Tests:** Provide mock HTTP headers and HTML bodies (matching the edge cases on webmention.rocks like HTML comments, multi-rel tags, empty hrefs, and unquoted header attributes) to ensure the discovery logic extracts the correct endpoint.
