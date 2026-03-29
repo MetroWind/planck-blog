@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
-#include <vector>
 #include <expected>
 #include <filesystem>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <mw/error.hpp>
 
@@ -35,5 +35,4 @@ struct Configuration
     StringMap custom_vars;
 
     static mw::E<Configuration> fromYaml(const std::filesystem::path& path);
-
 };

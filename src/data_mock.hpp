@@ -1,14 +1,14 @@
 #pragma once
 
-#include <vector>
-#include <string>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include <gmock/gmock.h>
-
-#include "data.hpp"
 #include <mw/error.hpp>
+
 #include "attachment.hpp"
+#include "data.hpp"
 #include "post.hpp"
 
 class DataSourceMock : public DataSourceInterface
@@ -20,18 +20,23 @@ public:
     MOCK_METHOD(mw::E<std::vector<Post>>, getPosts, (), (const override));
     MOCK_METHOD(mw::E<std::vector<Post>>, getPosts, (int start, int count),
                 (const override));
-    MOCK_METHOD(mw::E<std::vector<Post>>, getPostExcerpts, (), (const override));
-    MOCK_METHOD(mw::E<std::optional<Post>>, getPost, (int64_t id), (const override));
-    MOCK_METHOD(mw::E<void>, updatePost, (Post&& new_post), (const override));
+    MOCK_METHOD(mw::E<std::vector<Post>>, getPostExcerpts, (),
+                (const override));
+    MOCK_METHOD(mw::E<std::optional<Post>>, getPost, (int64_t id),
+                (const override));
+    MOCK_METHOD(mw::E<void>, updatePost, (Post && new_post), (const override));
     MOCK_METHOD(mw::E<void>, updatePostNoUpdateTime, (const Post& new_post),
                 (const override));
-    MOCK_METHOD(mw::E<int64_t>, saveDraft, (Post&& new_post), (const override));
+    MOCK_METHOD(mw::E<int64_t>, saveDraft, (Post && new_post),
+                (const override));
     MOCK_METHOD(mw::E<std::vector<Post>>, getDrafts, (), (const override));
-    MOCK_METHOD(mw::E<std::optional<Post>>, getDraft, (int64_t id), (const override));
+    MOCK_METHOD(mw::E<std::optional<Post>>, getDraft, (int64_t id),
+                (const override));
     MOCK_METHOD(mw::E<void>, editDraft, (const Post& draft), (const override));
     MOCK_METHOD(mw::E<void>, publishPost, (int64_t id), (const override));
     MOCK_METHOD(mw::E<void>, deletePost, (int64_t id), (const override));
-    MOCK_METHOD(mw::E<void>, addAttachment, (Attachment&& att), (const override));
+    MOCK_METHOD(mw::E<void>, addAttachment, (Attachment && att),
+                (const override));
     MOCK_METHOD(mw::E<std::optional<Attachment>>, getAttachment,
                 (const std::string& hash), (const override));
     MOCK_METHOD(mw::E<std::vector<Attachment>>, getAttachments, (),

@@ -1,15 +1,15 @@
-#include <optional>
 #include <chrono>
+#include <optional>
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <mw/error.hpp>
+#include <mw/test_utils.hpp>
+#include <mw/utils.hpp>
 
 #include "attachment.hpp"
 #include "data.hpp"
-#include <mw/error.hpp>
-#include <mw/utils.hpp>
 #include "post.hpp"
-#include <mw/test_utils.hpp>
 
 using ::testing::IsEmpty;
 
@@ -100,7 +100,8 @@ TEST(DataSource, CanAddAndDeleteAttachments)
         EXPECT_GT(mw::timeToSeconds(atts[0].upload_time), 0);
     }
     {
-        ASSIGN_OR_FAIL(std::optional<Attachment> att, data->getAttachment("bbb"));
+        ASSIGN_OR_FAIL(std::optional<Attachment> att,
+                       data->getAttachment("bbb"));
         ASSERT_TRUE(att.has_value());
         EXPECT_EQ(att->content_type, "aaa");
         EXPECT_EQ(att->hash, "bbb");

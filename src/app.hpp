@@ -8,19 +8,19 @@
 #include <string_view>
 
 #include <httplib.h>
-#include <spdlog/spdlog.h>
 #include <inja.hpp>
-
-#include "attachment.hpp"
 #include <mw/auth.hpp>
-#include "config.hpp"
-#include "data.hpp"
 #include <mw/crypto.hpp>
 #include <mw/http_client.hpp>
-#include "post_rendering.hpp"
-#include "theme.hpp"
 #include <mw/url.hpp>
 #include <mw/utils.hpp>
+#include <spdlog/spdlog.h>
+
+#include "attachment.hpp"
+#include "config.hpp"
+#include "data.hpp"
+#include "post_rendering.hpp"
+#include "theme.hpp"
 
 void copyToHttplibReq(const mw::HTTPRequest& src, httplib::Request& dest);
 
@@ -32,7 +32,8 @@ public:
         std::unique_ptr<mw::AuthInterface> openid_auth,
         std::unique_ptr<DataSourceInterface> data_source);
 
-    std::string urlFor(const std::string& name, const std::string& arg="") const;
+    std::string urlFor(const std::string& name,
+                       const std::string& arg = "") const;
 
     void handleIndex(const httplib::Request& req, httplib::Response& res);
     void handleLogin(httplib::Response& res) const;
@@ -42,22 +43,22 @@ public:
     void handleDrafts(const httplib::Request& req, httplib::Response& res);
     void handleCreatePostFrontEnd(const httplib::Request& req,
                                   httplib::Response& res);
-    void handleSaveDraft(const httplib::Request& req, httplib::Response& res)
-        const;
+    void handleSaveDraft(const httplib::Request& req,
+                         httplib::Response& res) const;
     void handleEditDraftFrontEnd(const httplib::Request& req,
                                  httplib::Response& res);
     void handleEditPostFrontEnd(const httplib::Request& req,
                                 httplib::Response& res);
-    void handleSavePost(const httplib::Request& req, httplib::Response& res)
-        const;
+    void handleSavePost(const httplib::Request& req,
+                        httplib::Response& res) const;
     void handlePublishFromDraft(const httplib::Request& req,
                                 httplib::Response& res) const;
     void handleAttachments(const httplib::Request& req, httplib::Response& res);
     void handleAttachment(const httplib::Request& req, httplib::Response& res);
     void handleAttachmentUpload(const httplib::Request& req,
                                 httplib::Response& res) const;
-    void handleSelectTheme(const httplib::Request& req, httplib::Response& res)
-        const;
+    void handleSelectTheme(const httplib::Request& req,
+                           httplib::Response& res) const;
     void handleFeed(const httplib::Request& req, httplib::Response& res);
 
     void start();
@@ -67,7 +68,12 @@ public:
 private:
     struct SessionValidation
     {
-        enum { VALID, REFRESHED, INVALID } status;
+        enum
+        {
+            VALID,
+            REFRESHED,
+            INVALID
+        } status;
         mw::UserInfo user;
         mw::Tokens new_tokens;
 
@@ -76,7 +82,8 @@ private:
             return {VALID, user_info, {}};
         }
 
-        static SessionValidation refreshed(mw::UserInfo&& user_info, mw::Tokens&& tokens)
+        static SessionValidation refreshed(mw::UserInfo&& user_info,
+                                           mw::Tokens&& tokens)
         {
             return {REFRESHED, user_info, tokens};
         }
@@ -95,12 +102,12 @@ private:
     // session are considered ok, and no status and body would be set
     // in “res”. In this case this function just returns an invalid
     // session.
-    std::optional<SessionValidation> prepareSession(
-        const httplib::Request& req, httplib::Response& res,
-        bool allow_error_and_invalid=false) const;
+    std::optional<SessionValidation>
+    prepareSession(const httplib::Request& req, httplib::Response& res,
+                   bool allow_error_and_invalid = false) const;
 
     nlohmann::json postToJson(const Post& p) const;
-    mw::E<nlohmann::json> renderPostToJson(Post&& p, bool use_cache=true);
+    mw::E<nlohmann::json> renderPostToJson(Post&& p, bool use_cache = true);
 
     // This gives a path, optionally with the name of an argument,
     // that is suitable to bind to a mw::URL handler. For example,
@@ -108,12 +115,12 @@ private:
     // “http://some.domain/blog/p/1”. Calling “getPath("post", "id")”
     // would give “/blog/p/:id”. This uses urlFor(), and therefore
     // requires that the mw::URL is mapped correctly in that function.
-    std::string getPath(const std::string& name, const std::string& arg_name="")
-        const;
+    std::string getPath(const std::string& name,
+                        const std::string& arg_name = "") const;
 
     // Convert HTML form data to post.
-    mw::E<Post> formToPost(const httplib::Request& req, std::string_view author)
-        const;
+    mw::E<Post> formToPost(const httplib::Request& req,
+                           std::string_view author) const;
 
     void setup();
     nlohmann::json baseTemplateData(const httplib::Request&) const;

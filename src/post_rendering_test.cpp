@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
+#include <mw/error.hpp>
+#include <mw/test_utils.hpp>
 
 #include "config.hpp"
 #include "post.hpp"
 #include "post_rendering.hpp"
-#include <mw/error.hpp>
-#include <mw/test_utils.hpp>
 
 TEST(Post, CanRenderAsciiDoc)
 {

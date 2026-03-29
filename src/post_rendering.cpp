@@ -1,15 +1,16 @@
+#include "post_rendering.hpp"
+
 #include <expected>
-#include <string>
 #include <format>
+#include <string>
 
 #include <macrodown/macrodown.h>
 #include <macrodown/standard_library.h>
-
-#include <unistd.h>
-#include <mw/exec.hpp>
-#include "post_rendering.hpp"
-#include <mw/utils.hpp>
 #include <mw/error.hpp>
+#include <mw/exec.hpp>
+#include <mw/utils.hpp>
+#include <unistd.h>
+
 #include "config.hpp"
 
 namespace
@@ -21,8 +22,10 @@ mw::E<std::string> renderMarkdown(const std::string& src)
     macrodown::StandardLibrary::registerMacros(md.evaluator());
 
     auto ast = md.parse(src);
-    if (!ast) {
-        return std::unexpected(mw::runtimeError("Failed to parse Markdown with MacroDown."));
+    if(!ast)
+    {
+        return std::unexpected(
+            mw::runtimeError("Failed to parse Markdown with MacroDown."));
     }
 
     std::string html = md.render(*ast);
@@ -32,21 +35,24 @@ mw::E<std::string> renderMarkdown(const std::string& src)
 mw::E<std::string> renderAsciiDoc(const std::string& src)
 {
     std::string output;
-    ASSIGN_OR_RETURN(mw::Process proc, mw::Process::exec(
-        src, {"asciidoctor", "-a", "stylesheet!", "-s", "-o", "-", "-"},
-        &output));
+    ASSIGN_OR_RETURN(mw::Process proc,
+                     mw::Process::exec(src,
+                                       {"asciidoctor", "-a", "stylesheet!",
+                                        "-s", "-o", "-", "-"},
+                                       &output));
     ASSIGN_OR_RETURN(int status, proc.wait());
     if(status != 0)
     {
-        return std::unexpected(mw::runtimeError(std::format(
-            "AsciiDoctor failed with code {}", status)));
+        return std::unexpected(mw::runtimeError(
+            std::format("AsciiDoctor failed with code {}", status)));
     }
     return output;
 }
 
 } // namespace
 
-mw::E<std::string> renderPost(const Post& p, [[maybe_unused]] const Configuration& conf)
+mw::E<std::string> renderPost(const Post& p,
+                              [[maybe_unused]] const Configuration& conf)
 {
     switch(p.markup)
     {

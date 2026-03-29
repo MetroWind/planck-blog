@@ -1,22 +1,22 @@
-#include <httplib.h>
 #include <memory>
 #include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-
-#include "app.hpp"
-#include "attachment.hpp"
+#include <httplib.h>
 #include <mw/auth.hpp>
-#include "config.hpp"
 #include <mw/auth_mock.hpp>
-#include "data_mock.hpp"
 #include <mw/http_client.hpp>
 #include <mw/test_utils.hpp>
 #include <mw/utils.hpp>
 
-using ::testing::Return;
+#include "app.hpp"
+#include "attachment.hpp"
+#include "config.hpp"
+#include "data_mock.hpp"
+
 using ::testing::HasSubstr;
+using ::testing::Return;
 
 class UserAppTest : public testing::Test
 {
@@ -53,8 +53,10 @@ protected:
 TEST(App, CopyReqToHttplibReq)
 {
     {
-        auto req = mw::HTTPRequest("http://test/").setPayload("aaa")
-            .setContentType("text/plain").addHeader("X-Something", "something");
+        auto req = mw::HTTPRequest("http://test/")
+                       .setPayload("aaa")
+                       .setContentType("text/plain")
+                       .addHeader("X-Something", "something");
         httplib::Request http_req;
         copyToHttplibReq(req, http_req);
         EXPECT_EQ(http_req.body, "aaa");
@@ -95,7 +97,8 @@ TEST(App, CanHandleOpenIDRedirect)
     expected_user.name = "mw";
 
     EXPECT_CALL(*auth, authenticate("aaa")).WillOnce(Return(expected_tokens));
-    EXPECT_CALL(*auth, getUser(expected_tokens)).WillOnce(Return(expected_user));
+    EXPECT_CALL(*auth, getUser(expected_tokens))
+        .WillOnce(Return(expected_user));
     ASSIGN_OR_FAIL(auto data, DataSourceSqlite::newFromMemory());
     App app(config, std::move(auth), std::move(data));
 
@@ -153,9 +156,11 @@ TEST_F(UserAppTest, CanHandleDrafts)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res, client.get(
-            mw::HTTPRequest("http://localhost:8080/blog/drafts")
-            .addHeader("Cookie", "planck-blog-access-token=aaa")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.get(
+                mw::HTTPRequest("http://localhost:8080/blog/drafts")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")));
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_THAT(res->payloadAsStr(), HasSubstr("<title>Drafts</title>"));
     }
@@ -168,9 +173,11 @@ TEST_F(UserAppTest, CanHandleCreatePostFrontEnd)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res, client.get(
-            mw::HTTPRequest("http://localhost:8080/blog/create-post")
-            .addHeader("Cookie", "planck-blog-access-token=aaa")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.get(
+                mw::HTTPRequest("http://localhost:8080/blog/create-post")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")));
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_THAT(res->payloadAsStr(), HasSubstr("<title>New Post</title>"));
     }
@@ -192,12 +199,15 @@ TEST_F(UserAppTest, CanHandleCreateDraft)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res, client.post(
-            mw::HTTPRequest("http://localhost:8080/blog/save-draft").setPayload(
-                "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
-                "content=ddd")
-            .addHeader("Cookie", "planck-blog-access-token=aaa")
-            .setContentType("application/x-www-form-urlencoded")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.post(
+                mw::HTTPRequest("http://localhost:8080/blog/save-draft")
+                    .setPayload(
+                        "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
+                        "content=ddd")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")
+                    .setContentType("application/x-www-form-urlencoded")));
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
         EXPECT_EQ(res->header.at("Location"),
@@ -222,17 +232,19 @@ TEST_F(UserAppTest, CanHandlePublishFromNewDraft)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res, client.post(
-            mw::HTTPRequest("http://localhost:8080/blog/publish-from-new-draft")
-            .setPayload(
-                "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
-                "content=ddd")
-            .addHeader("Cookie", "planck-blog-access-token=aaa")
-            .setContentType("application/x-www-form-urlencoded")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.post(
+                mw::HTTPRequest(
+                    "http://localhost:8080/blog/publish-from-new-draft")
+                    .setPayload(
+                        "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
+                        "content=ddd")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")
+                    .setContentType("application/x-www-form-urlencoded")));
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
-        EXPECT_EQ(res->header.at("Location"),
-                  "http://localhost:8080/blog/p/1");
+        EXPECT_EQ(res->header.at("Location"), "http://localhost:8080/blog/p/1");
     }
     app->stop();
     app->wait();
@@ -255,9 +267,11 @@ TEST_F(UserAppTest, CanHandlePost)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res,
-                       client.get(mw::HTTPRequest("http://localhost:8080/blog/p/1")
-                                  .addHeader("Cookie", "planck-blog-access-token=aaa")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.get(
+                mw::HTTPRequest("http://localhost:8080/blog/p/1")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")));
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_THAT(res->payloadAsStr(), HasSubstr("<h1>aaa</h1>"));
         EXPECT_THAT(res->payloadAsStr(),
@@ -282,9 +296,11 @@ TEST_F(UserAppTest, CanHandleEditPostFrontEnd)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res, client.get(
-            mw::HTTPRequest("http://localhost:8080/blog/edit-post/1")
-            .addHeader("Cookie", "planck-blog-access-token=aaa")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.get(
+                mw::HTTPRequest("http://localhost:8080/blog/edit-post/1")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")));
 
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
     }
@@ -308,12 +324,15 @@ TEST_F(UserAppTest, CanHandleSavePost)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res, client.post(
-            mw::HTTPRequest("http://localhost:8080/blog/save-post").setPayload(
-                "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
-                "content=ddd&id=1")
-            .addHeader("Cookie", "planck-blog-access-token=aaa")
-            .setContentType("application/x-www-form-urlencoded")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.post(
+                mw::HTTPRequest("http://localhost:8080/blog/save-post")
+                    .setPayload(
+                        "title=aaa&abstract=bbb&language=ccc&markup=CommonMark&"
+                        "content=ddd&id=1")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")
+                    .setContentType("application/x-www-form-urlencoded")));
 
         EXPECT_EQ(res->status, 302) << "Response body: " << res->payloadAsStr();
         EXPECT_EQ(res->header.at("Location"), "http://localhost:8080/blog/p/1");
@@ -336,13 +355,17 @@ TEST_F(UserAppTest, CanHandleAttachments)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res, client.get(
-            mw::HTTPRequest("http://localhost:8080/blog/attachments")
-            .addHeader("Cookie", "planck-blog-access-token=aaa")));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.get(
+                mw::HTTPRequest("http://localhost:8080/blog/attachments")
+                    .addHeader("Cookie", "planck-blog-access-token=aaa")));
 
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
-        EXPECT_THAT(res->payloadAsStr(), HasSubstr(
-            R"(<a href="http://localhost:8080/blog/attachment/xyz/aaa.txt">)"));
+        EXPECT_THAT(
+            res->payloadAsStr(),
+            HasSubstr(
+                R"(<a href="http://localhost:8080/blog/attachment/xyz/aaa.txt">)"));
     }
     app->stop();
     app->wait();
@@ -360,8 +383,9 @@ TEST_F(UserAppTest, CanHandleAttachment)
     app->start();
     {
         mw::HTTPSession client;
-        ASSIGN_OR_FAIL(const mw::HTTPResponse* res,
-                       client.get("http://localhost:8080/blog/attachment/xyz/test.png"));
+        ASSIGN_OR_FAIL(
+            const mw::HTTPResponse* res,
+            client.get("http://localhost:8080/blog/attachment/xyz/test.png"));
 
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
         EXPECT_EQ(res->payloadAsStr().size(), 313);

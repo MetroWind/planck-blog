@@ -1,16 +1,17 @@
-#include <string>
+#include "config.hpp"
+
 #include <expected>
 #include <filesystem>
-#include <fstream>
 #include <format>
+#include <fstream>
+#include <string>
 
+#include <mw/error.hpp>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
 
-#include "config.hpp"
-#include <mw/error.hpp>
-
-namespace {
+namespace
+{
 
 mw::E<std::vector<char>> readFile(const std::filesystem::path& path)
 {
@@ -28,8 +29,7 @@ mw::E<std::vector<char>> readFile(const std::filesystem::path& path)
     return content;
 }
 
-template<class T>
-bool getYamlValue(ryml::ConstNodeRef node, T& result)
+template <class T> bool getYamlValue(ryml::ConstNodeRef node, T& result)
 {
     auto value = node.val();
     auto status = std::from_chars(value.begin(), value.end(), result);
@@ -85,7 +85,7 @@ mw::E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     }
     if(tree["languages"].is_seq())
     {
-        for(const auto& lang: tree["languages"])
+        for(const auto& lang : tree["languages"])
         {
             lang >> config.languages.emplace_back();
         }
