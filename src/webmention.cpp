@@ -44,11 +44,10 @@ void WebMentionManager::verifyWebMentionSync(int64_t mention_id,
     }
 
     auto session = session_factory_();
+    session->maxRedirections(20);
+    session->transferTimeout(std::chrono::duration<long>(10));
+    session->maxSize(1024 * 1024); // 1MB
     mw::HTTPRequest req(source);
-    req.follow_redirects = true;
-    req.max_redirects = 20;
-    req.timeout_ms = 10000;
-    req.max_size = 1024 * 1024; // 1MB
 
     auto res = session->get(req);
     if(!res.has_value())
@@ -232,11 +231,10 @@ void WebMentionManager::sendWebMentionsSync(
     for(const auto& target : target_urls)
     {
         auto session = session_factory_();
+        session->maxRedirections(20);
+        session->transferTimeout(std::chrono::duration<long>(10));
+        session->maxSize(1024 * 1024); // 1MB
         mw::HTTPRequest req(target);
-        req.follow_redirects = true;
-        req.max_redirects = 20;
-        req.timeout_ms = 10000;
-        req.max_size = 1024 * 1024; // 1MB
 
         auto res = session->get(req);
         if(!res.has_value())
@@ -245,20 +243,23 @@ void WebMentionManager::sendWebMentionsSync(
         }
 
         const mw::HTTPResponse* response = res.value();
-        std::string final_url =
-            response->final_url.empty() ? target : response->final_url;
+        // TODO: this is supposed to be the URL after redirections.
+        const std::string& final_url = target;
 
         std::optional<std::string> endpoint = discoverEndpoint(*response);
 
         if(endpoint.has_value())
         {
             // Resolve URL
+            //
+            // TODO: The intention is to resolve domain to IP so we
+            // can check if it’s a local/private IP. However we don’t
+            // have a way to do that right now. So this does nothing.
             auto target_url_obj = mw::URL::fromStr(final_url);
             if(target_url_obj.has_value())
             {
-                target_url_obj->resolve(*endpoint);
-                notifyEndpoint(session_factory_, target_url_obj->str(),
-                               source_url, target);
+                const std::string& resolved = *endpoint;
+                notifyEndpoint(session_factory_, resolved, source_url, target);
             }
         }
     }

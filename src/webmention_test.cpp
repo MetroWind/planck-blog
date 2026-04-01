@@ -55,6 +55,11 @@ TEST(WebMention, VerifyWebMentionDrops404)
         data_mock,
         [](mw::HTTPSessionMock& mock)
         {
+            EXPECT_CALL(mock, maxRedirections(20))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, transferTimeout(_))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, maxSize(_)).WillOnce(Return(mw::E<void>{}));
             EXPECT_CALL(mock, get(_))
                 .WillOnce(Invoke(
                     [](const mw::HTTPRequest&) -> mw::E<const mw::HTTPResponse*>
@@ -76,6 +81,11 @@ TEST(WebMention, VerifyWebMentionAllowsSSRFIfConfigured)
         data_mock,
         [](mw::HTTPSessionMock& mock)
         {
+            EXPECT_CALL(mock, maxRedirections(20))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, transferTimeout(_))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, maxSize(_)).WillOnce(Return(mw::E<void>{}));
             EXPECT_CALL(mock, get(_))
                 .WillOnce(Invoke(
                     [](const mw::HTTPRequest&) -> mw::E<const mw::HTTPResponse*>
@@ -98,6 +108,11 @@ TEST(WebMention, VerifyWebMentionValidHtml)
         data_mock,
         [](mw::HTTPSessionMock& mock)
         {
+            EXPECT_CALL(mock, maxRedirections(20))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, transferTimeout(_))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, maxSize(_)).WillOnce(Return(mw::E<void>{}));
             EXPECT_CALL(mock, get(_))
                 .WillOnce(Invoke(
                     [](const mw::HTTPRequest&) -> mw::E<const mw::HTTPResponse*>
@@ -135,7 +150,6 @@ TEST(WebMention, SendWebMentionsDiscoverFromHeaderAndPost)
             {
                 static mw::HTTPResponse res;
                 res.status = 200;
-                res.final_url = "http://target.com/page";
                 res.header["Link"] =
                     "<http://target.com/webmention>; rel=\"webmention\"";
                 return &res;
@@ -172,6 +186,40 @@ TEST(WebMention, SendWebMentionsDiscoverFromHeaderAndPost)
                 post(const mw::HTTPRequest& req) override
                 {
                     return mock_->post(req);
+                }
+                std::chrono::duration<long> transferTimeout() const override
+                {
+                    return std::chrono::duration<long>(0);
+                }
+                mw::E<void>
+                transferTimeout(std::chrono::duration<long>) override
+                {
+                    return {};
+                }
+                std::chrono::duration<long> connectionTimeout() const override
+                {
+                    return std::chrono::duration<long>(60);
+                }
+                mw::E<void>
+                connectionTimeout(std::chrono::duration<long>) override
+                {
+                    return {};
+                }
+                long maxSize() const override
+                {
+                    return 2147483648;
+                }
+                mw::E<void> maxSize(long) override
+                {
+                    return {};
+                }
+                long maxRedirections() const override
+                {
+                    return 20;
+                }
+                mw::E<void> maxRedirections(long) override
+                {
+                    return {};
                 }
             };
             return std::make_unique<MockWrapper>(shared_mock);
