@@ -224,43 +224,124 @@ void WebMentionManager::sendWebMentions(
         .detach();
 }
 
+namespace
+{
+
+std::optional<std::string> findHeader(const mw::HTTPResponse& res,
+                                      std::string_view name)
+{
+    std::string lname(name);
+    std::transform(lname.begin(), lname.end(), lname.begin(), ::tolower);
+    for(const auto& [k, v] : res.header)
+    {
+        std::string lk = k;
+        std::transform(lk.begin(), lk.end(), lk.begin(), ::tolower);
+        if(lk == lname)
+        {
+            return v;
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
 void WebMentionManager::sendWebMentionsSync(
     const std::string& source_url,
     const std::set<std::string>& target_urls) const
 {
+    constexpr int MAX_REDIRECTS = 20;
+    constexpr long MAX_SIZE_BYTES = 1024 * 1024;
+    constexpr auto TRANSFER_TIMEOUT = std::chrono::duration<long>(10);
+
     for(const auto& target : target_urls)
     {
-        auto session = session_factory_();
-        session->maxRedirections(20);
-        session->transferTimeout(std::chrono::duration<long>(10));
-        session->maxSize(1024 * 1024); // 1MB
-        mw::HTTPRequest req(target);
+        // Manually follow redirects so we can record the final URL,
+        // which is needed to resolve relative endpoints later.
+        std::unique_ptr<mw::HTTPSessionInterface> session;
+        const mw::HTTPResponse* response = nullptr;
+        std::string current_url = target;
+        bool fetch_ok = false;
 
-        auto res = session->get(req);
-        if(!res.has_value())
+        for(int hop = 0; hop <= MAX_REDIRECTS; ++hop)
+        {
+            session = session_factory_();
+            session->maxRedirections(0);
+            session->transferTimeout(TRANSFER_TIMEOUT);
+            session->maxSize(MAX_SIZE_BYTES);
+            mw::HTTPRequest req(current_url);
+
+            auto res = session->get(req);
+            if(!res.has_value())
+            {
+                spdlog::warn("Failed to fetch {} for webmention discovery: {}",
+                             current_url, mw::errorMsg(res.error()));
+                break;
+            }
+            response = res.value();
+            if(response->status < 300 || response->status >= 400)
+            {
+                fetch_ok = true;
+                break;
+            }
+            // 3xx: try to follow.
+            if(hop == MAX_REDIRECTS)
+            {
+                spdlog::warn("Too many redirects fetching {}", target);
+                break;
+            }
+            auto loc = findHeader(*response, "Location");
+            if(!loc.has_value())
+            {
+                // 3xx without Location: treat what we have as final.
+                fetch_ok = true;
+                break;
+            }
+            auto base = mw::URL::fromStr(current_url);
+            if(!base.has_value())
+            {
+                break;
+            }
+            auto next = base->resolve(*loc);
+            if(!next.has_value())
+            {
+                spdlog::warn("Cannot resolve redirect '{}' against {}", *loc,
+                             current_url);
+                break;
+            }
+            current_url = next->str();
+        }
+
+        if(!fetch_ok || response == nullptr)
         {
             continue;
         }
 
-        const mw::HTTPResponse* response = res.value();
-        // TODO: this is supposed to be the URL after redirections.
-        const std::string& final_url = target;
-
+        const std::string final_url = current_url;
         std::optional<std::string> endpoint = discoverEndpoint(*response);
-
-        if(endpoint.has_value())
+        if(!endpoint.has_value())
         {
-            // Resolve URL
-            //
-            // TODO: The intention is to resolve domain to IP so we
-            // can check if it’s a local/private IP. However we don’t
-            // have a way to do that right now. So this does nothing.
-            auto target_url_obj = mw::URL::fromStr(final_url);
-            if(target_url_obj.has_value())
-            {
-                const std::string& resolved = *endpoint;
-                notifyEndpoint(session_factory_, resolved, source_url, target);
-            }
+            continue;
         }
+
+        auto base = mw::URL::fromStr(final_url);
+        if(!base.has_value())
+        {
+            continue;
+        }
+        auto resolved = base->resolve(*endpoint);
+        if(!resolved.has_value())
+        {
+            spdlog::warn("Cannot resolve webmention endpoint '{}' against {}",
+                         *endpoint, final_url);
+            continue;
+        }
+        std::string resolved_str = resolved->str();
+        if(resolved_str.empty())
+        {
+            continue;
+        }
+
+        notifyEndpoint(session_factory_, resolved_str, source_url, target);
     }
 }

@@ -389,6 +389,10 @@ std::string App::urlFor(const std::string& name, const std::string& arg) const
     {
         return mw::URL(base_url).appendPath("publish-from-new-draft").str();
     }
+    if(name == "delete-post")
+    {
+        return mw::URL(base_url).appendPath("delete-post").appendPath(arg).str();
+    }
     if(name == "upload-attachment")
     {
         return mw::URL(base_url).appendPath("upload-attachment").str();
@@ -800,6 +804,55 @@ void App::handlePublishFromDraft(const httplib::Request& req,
     res.set_redirect(urlFor("post", std::to_string(id)));
 }
 
+void App::handleDeletePost(const httplib::Request& req,
+                           httplib::Response& res) const
+{
+    auto session = prepareSession(req, res);
+    if(!session.has_value())
+    {
+        return;
+    }
+
+    ASSIGN_OR_RESPOND_ERROR(
+        int64_t id,
+        mw::strToNumber<int64_t>(req.path_params.at("id"))
+            .or_else(
+                []([[maybe_unused]] auto _) -> mw::E<int64_t>
+                {
+                    return std::unexpected(
+                        mw::httpError(400, "Invalid post ID"));
+                }),
+        res);
+
+    // Capture outgoing links before deletion so we can notify their
+    // endpoints. After deletion, those URLs will return 410 Gone, and
+    // recipients can drop the WebMention from their side.
+    std::set<std::string> links_to_notify;
+    auto post_maybe = data->getPost(id);
+    if(post_maybe.has_value() && post_maybe->has_value())
+    {
+        links_to_notify = extractLinks(**post_maybe);
+    }
+
+    auto del = data->deletePost(id);
+    if(!del.has_value())
+    {
+        res.status = 500;
+        res.set_content(std::string("Failed to delete post: ") +
+                            errorMsg(del.error()),
+                        "text/plain");
+        return;
+    }
+
+    if(!links_to_notify.empty())
+    {
+        webmention_manager->sendWebMentions(
+            urlFor("post", std::to_string(id)), links_to_notify);
+    }
+
+    res.set_redirect(urlFor("index"));
+}
+
 void App::handleAttachments(const httplib::Request& req, httplib::Response& res)
 {
     auto session = prepareSession(req, res);
@@ -1149,6 +1202,9 @@ void App::setup()
     server.Post(getPath("publish-from-draft"),
                 [&](const httplib::Request& req, httplib::Response& res)
                 { handlePublishFromDraft(req, res); });
+    server.Post(getPath("delete-post", "id"),
+                [&](const httplib::Request& req, httplib::Response& res)
+                { handleDeletePost(req, res); });
     server.Get(getPath("attachments"),
                [&](const httplib::Request& req, httplib::Response& res)
                { handleAttachments(req, res); });
