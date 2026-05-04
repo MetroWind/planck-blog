@@ -78,10 +78,32 @@ void WebMentionManager::verifyWebMentionSync(int64_t mention_id,
     }
 
     std::optional<std::string> snippet;
+    std::optional<std::string> author_name;
+    std::optional<std::string> author_photo;
     if(content_type.find("text/html") != std::string::npos)
     {
         snippet =
             HtmlSanitizer::extractAndSanitizeSnippet(payload, target, 500);
+        auto author = HtmlSanitizer::extractAuthor(payload);
+        author_name = std::move(author.name);
+        if(author.photo.has_value())
+        {
+            // Resolve the photo URL (it may be relative) against the
+            // source page. Drop it if resolution fails.
+            auto base = mw::URL::fromStr(source);
+            if(base.has_value())
+            {
+                auto resolved = base->resolve(*author.photo);
+                if(resolved.has_value())
+                {
+                    std::string s = resolved->str();
+                    if(!s.empty())
+                    {
+                        author_photo = std::move(s);
+                    }
+                }
+            }
+        }
     }
     else
     {
@@ -117,7 +139,8 @@ void WebMentionManager::verifyWebMentionSync(int64_t mention_id,
         snippet = esc;
     }
 
-    data_.updateWebMention(mention_id, 1, std::nullopt, std::nullopt, snippet);
+    data_.updateWebMention(mention_id, 1, std::move(author_name),
+                           std::move(author_photo), snippet);
 }
 
 namespace

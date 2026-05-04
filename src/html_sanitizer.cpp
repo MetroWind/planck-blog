@@ -1,9 +1,12 @@
 #include "html_sanitizer.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <set>
+#include <string_view>
 #include <vector>
 
+#include <mw/utils.hpp>
 #include <string.h>
 #include <tidy.h>
 #include <tidybuffio.h>
@@ -227,6 +230,139 @@ bool isBlockLevel(const std::string& name)
     return blocks.count(name) > 0;
 }
 
+std::optional<std::string> getAttr(TidyNode node, std::string_view name)
+{
+    for(TidyAttr a = tidyAttrFirst(node); a; a = tidyAttrNext(a))
+    {
+        ctmbstr n = tidyAttrName(a);
+        if(n && std::string_view(n) == name)
+        {
+            ctmbstr v = tidyAttrValue(a);
+            return v ? std::string(v) : std::string();
+        }
+    }
+    return std::nullopt;
+}
+
+bool hasClassToken(TidyNode node, std::string_view token)
+{
+    auto cls = getAttr(node, "class");
+    if(!cls.has_value())
+    {
+        return false;
+    }
+    const std::string& s = *cls;
+    size_t i = 0;
+    while(i < s.size())
+    {
+        while(i < s.size() &&
+              std::isspace(static_cast<unsigned char>(s[i])))
+        {
+            ++i;
+        }
+        size_t j = i;
+        while(j < s.size() &&
+              !std::isspace(static_cast<unsigned char>(s[j])))
+        {
+            ++j;
+        }
+        if(j > i && std::string_view(s).substr(i, j - i) == token)
+        {
+            return true;
+        }
+        i = j;
+    }
+    return false;
+}
+
+TidyNode findFirstByClass(TidyNode node, std::string_view token)
+{
+    if(!node)
+    {
+        return nullptr;
+    }
+    TidyNodeType type = tidyNodeGetType(node);
+    if((type == TidyNode_Start || type == TidyNode_StartEnd) &&
+       hasClassToken(node, token))
+    {
+        return node;
+    }
+    for(TidyNode c = tidyGetChild(node); c; c = tidyGetNext(c))
+    {
+        if(TidyNode r = findFirstByClass(c, token))
+        {
+            return r;
+        }
+    }
+    return nullptr;
+}
+
+void collectInnerText(TidyDoc tdoc, TidyNode node, std::string& out,
+                      size_t max_len)
+{
+    if(!node || out.size() >= max_len)
+    {
+        return;
+    }
+    TidyNodeType type = tidyNodeGetType(node);
+    if(type == TidyNode_Text)
+    {
+        TidyBuffer buf;
+        tidyBufInit(&buf);
+        tidyNodeGetValue(tdoc, node, &buf);
+        if(buf.bp)
+        {
+            out += reinterpret_cast<const char*>(buf.bp);
+        }
+        tidyBufFree(&buf);
+        return;
+    }
+    for(TidyNode c = tidyGetChild(node); c; c = tidyGetNext(c))
+    {
+        collectInnerText(tdoc, c, out, max_len);
+        if(out.size() >= max_len)
+        {
+            return;
+        }
+    }
+}
+
+bool isUnsafeUrlScheme(const std::string& url)
+{
+    std::string lower;
+    lower.reserve(11);
+    for(size_t i = 0; i < url.size() && i < 11; ++i)
+    {
+        lower += static_cast<char>(
+            std::tolower(static_cast<unsigned char>(url[i])));
+    }
+    return lower.starts_with("javascript:");
+}
+
+std::optional<std::string> photoFromNode(TidyNode node)
+{
+    ctmbstr name = tidyNodeGetName(node);
+    if(!name)
+    {
+        return std::nullopt;
+    }
+    std::string n = name;
+    std::optional<std::string> raw;
+    if(n == "img")
+    {
+        raw = getAttr(node, "src");
+    }
+    else if(n == "a")
+    {
+        raw = getAttr(node, "href");
+    }
+    if(!raw.has_value() || raw->empty() || isUnsafeUrlScheme(*raw))
+    {
+        return std::nullopt;
+    }
+    return raw;
+}
+
 } // namespace
 
 std::optional<std::string>
@@ -384,4 +520,107 @@ HtmlSanitizer::discoverWebmentionEndpoint(const std::string& raw_html)
 
     tidyRelease(tdoc);
     return endpoint;
+}
+
+HtmlSanitizer::AuthorInfo
+HtmlSanitizer::extractAuthor(const std::string& raw_html)
+{
+    AuthorInfo info;
+
+    TidyDoc tdoc = tidyCreate();
+    tidyOptSetBool(tdoc, TidyForceOutput, yes);
+    tidyOptSetBool(tdoc, TidyMark, no);
+    tidyParseString(tdoc, raw_html.c_str());
+    tidyCleanAndRepair(tdoc);
+
+    TidyNode root = tidyGetRoot(tdoc);
+    TidyNode author_root = findFirstByClass(root, "p-author");
+
+    // Photo. If we have a p-author subtree, look there first; the
+    // p-author element itself may carry u-photo (e.g. <a class=
+    // "p-author u-photo">). Otherwise fall back to a document-wide
+    // u-photo.
+    TidyNode photo_node = nullptr;
+    if(author_root)
+    {
+        if(hasClassToken(author_root, "u-photo"))
+        {
+            photo_node = author_root;
+        }
+        else
+        {
+            photo_node = findFirstByClass(author_root, "u-photo");
+        }
+    }
+    if(!photo_node)
+    {
+        photo_node = findFirstByClass(root, "u-photo");
+    }
+    if(photo_node)
+    {
+        if(auto src = photoFromNode(photo_node); src.has_value())
+        {
+            std::string_view stripped = mw::strip(*src);
+            if(!stripped.empty())
+            {
+                info.photo = std::string(stripped);
+            }
+        }
+    }
+
+    // Name. Prefer p-name within the p-author subtree; otherwise use
+    // the inner text of p-author itself; otherwise fall back to a
+    // document-wide p-name.
+    constexpr size_t MAX_NAME_LEN = 200;
+    auto extract_text = [&](TidyNode n) -> std::optional<std::string>
+    {
+        std::string text;
+        collectInnerText(tdoc, n, text, MAX_NAME_LEN);
+        std::string_view stripped = mw::strip(text);
+        if(stripped.empty())
+        {
+            return std::nullopt;
+        }
+        return std::string(stripped);
+    };
+
+    if(author_root)
+    {
+        if(TidyNode name_node = findFirstByClass(author_root, "p-name");
+           name_node)
+        {
+            info.name = extract_text(name_node);
+        }
+        else
+        {
+            info.name = extract_text(author_root);
+            // <img class="p-author"> has no inner text; fall back to alt.
+            if(!info.name.has_value())
+            {
+                ctmbstr tag = tidyNodeGetName(author_root);
+                if(tag && std::string(tag) == "img")
+                {
+                    if(auto alt = getAttr(author_root, "alt");
+                       alt.has_value())
+                    {
+                        std::string_view stripped = mw::strip(*alt);
+                        if(!stripped.empty())
+                        {
+                            info.name = std::string(stripped);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        if(TidyNode name_node = findFirstByClass(root, "p-name"); name_node)
+        {
+            info.name = extract_text(name_node);
+        }
+    }
+
+    tidyRelease(tdoc);
+    return info;
 }

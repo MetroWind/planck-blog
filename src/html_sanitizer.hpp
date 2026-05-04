@@ -16,4 +16,16 @@ public:
     // Returns the href attribute.
     static std::optional<std::string>
     discoverWebmentionEndpoint(const std::string& raw_html);
+
+    struct AuthorInfo
+    {
+        std::optional<std::string> name;
+        // Raw href; may be relative to the page URL.
+        std::optional<std::string> photo;
+    };
+
+    // Parses HTML and extracts the author name and photo using
+    // microformats2 (p-author / p-name / u-photo). Best-effort; any
+    // field may be missing.
+    static AuthorInfo extractAuthor(const std::string& raw_html);
 };

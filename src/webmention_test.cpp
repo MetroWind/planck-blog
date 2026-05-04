@@ -138,6 +138,60 @@ TEST(WebMention, VerifyWebMentionValidHtml)
     wm.verifyWebMentionSync(1, "http://source.com/valid", "http://target.com");
 }
 
+TEST(WebMention, VerifyWebMentionExtractsMicroformatsAuthor)
+{
+    StrictMock<DataSourceMock> data_mock;
+    auto wm = createManager(
+        data_mock,
+        [](mw::HTTPSessionMock& mock)
+        {
+            EXPECT_CALL(mock, maxRedirections(20))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, transferTimeout(_))
+                .WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, maxSize(_)).WillOnce(Return(mw::E<void>{}));
+            EXPECT_CALL(mock, get(_))
+                .WillOnce(Invoke(
+                    [](const mw::HTTPRequest&) -> mw::E<const mw::HTTPResponse*>
+                    {
+                        static mw::HTTPResponse res;
+                        res.status = 200;
+                        res.header["Content-Type"] = "text/html";
+                        // h-card with a relative photo URL — should be
+                        // resolved against the source page URL.
+                        std::string body =
+                            "<html><body>"
+                            "<article class=\"h-entry\">"
+                            "<div class=\"p-author h-card\">"
+                            "<a class=\"p-name u-url\" href=\"/about\">"
+                            "Alice</a>"
+                            "<img class=\"u-photo\" src=\"/img/alice.jpg\">"
+                            "</div>"
+                            "<p>Hello "
+                            "<a href=\"http://target.com\">link</a></p>"
+                            "</article>"
+                            "</body></html>";
+                        res.payload = std::vector<std::byte>(
+                            reinterpret_cast<const std::byte*>(body.data()),
+                            reinterpret_cast<const std::byte*>(body.data() +
+                                                               body.size()));
+                        return &res;
+                    }));
+        });
+
+    EXPECT_CALL(
+        data_mock,
+        updateWebMention(
+            1, 1,
+            std::optional<std::string>("Alice"),
+            std::optional<std::string>("http://source.com/img/alice.jpg"),
+            testing::Ne(std::nullopt)))
+        .WillOnce(Return(mw::E<void>{}));
+
+    wm.verifyWebMentionSync(1, "http://source.com/posts/123",
+                            "http://target.com");
+}
+
 TEST(WebMention, SendWebMentionsDiscoverFromHeaderAndPost)
 {
     StrictMock<DataSourceMock> data_mock;
