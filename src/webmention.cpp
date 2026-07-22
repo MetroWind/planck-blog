@@ -12,6 +12,53 @@
 #include "data.hpp"
 #include "html_sanitizer.hpp"
 
+namespace
+{
+
+void deleteWebMention(DataSourceInterface& data, int64_t mention_id)
+{
+    auto result = data.deleteWebMention(mention_id);
+    if(!result)
+    {
+        spdlog::error("Failed to delete WebMention {}: {}", mention_id,
+                      mw::errorMsg(result.error()));
+    }
+}
+
+bool configureSession(mw::HTTPSessionInterface& session,
+                      long max_redirections,
+                      std::chrono::duration<long> transfer_timeout,
+                      long max_size)
+{
+    auto result = session.maxRedirections(max_redirections);
+    if(!result)
+    {
+        spdlog::error("Failed to set HTTP redirect limit: {}",
+                      mw::errorMsg(result.error()));
+        return false;
+    }
+
+    result = session.transferTimeout(transfer_timeout);
+    if(!result)
+    {
+        spdlog::error("Failed to set HTTP transfer timeout: {}",
+                      mw::errorMsg(result.error()));
+        return false;
+    }
+
+    result = session.maxSize(max_size);
+    if(!result)
+    {
+        spdlog::error("Failed to set HTTP response size limit: {}",
+                      mw::errorMsg(result.error()));
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace
+
 void WebMentionManager::verifyWebMention(int64_t mention_id,
                                          const std::string& source,
                                          const std::string& target) const
@@ -29,7 +76,7 @@ void WebMentionManager::verifyWebMentionSync(int64_t mention_id,
     auto source_url_opt = mw::URL::fromStr(source);
     if(!source_url_opt.has_value())
     {
-        data_.deleteWebMention(mention_id);
+        deleteWebMention(data_, mention_id);
         return;
     }
     std::string host = source_url_opt->host();
@@ -38,35 +85,38 @@ void WebMentionManager::verifyWebMentionSync(int64_t mention_id,
         if(host == "localhost" || host == "127.0.0.1" || host == "::1" ||
            host.starts_with("192.168.") || host.starts_with("10."))
         {
-            data_.deleteWebMention(mention_id);
+            deleteWebMention(data_, mention_id);
             return;
         }
     }
 
     auto session = session_factory_();
-    session->maxRedirections(20);
-    session->transferTimeout(std::chrono::duration<long>(10));
-    session->maxSize(1024 * 1024); // 1MB
+    if(!configureSession(*session, 20, std::chrono::duration<long>(10),
+                         1024 * 1024)) // 1MB
+    {
+        deleteWebMention(data_, mention_id);
+        return;
+    }
     mw::HTTPRequest req(source);
 
     auto res = session->get(req);
     if(!res.has_value())
     {
-        data_.deleteWebMention(mention_id);
+        deleteWebMention(data_, mention_id);
         return;
     }
 
     const mw::HTTPResponse* response = res.value();
     if(response->status == 404 || response->status == 410)
     {
-        data_.deleteWebMention(mention_id);
+        deleteWebMention(data_, mention_id);
         return;
     }
 
     std::string payload(response->payloadAsStr());
     if(payload.find(target) == std::string::npos)
     {
-        data_.deleteWebMention(mention_id);
+        deleteWebMention(data_, mention_id);
         return;
     }
 
@@ -139,8 +189,14 @@ void WebMentionManager::verifyWebMentionSync(int64_t mention_id,
         snippet = esc;
     }
 
-    data_.updateWebMention(mention_id, 1, std::move(author_name),
-                           std::move(author_photo), snippet);
+    auto update_result = data_.updateWebMention(
+        mention_id, 1, std::move(author_name), std::move(author_photo),
+        std::move(snippet));
+    if(!update_result)
+    {
+        spdlog::error("Failed to update WebMention {}: {}", mention_id,
+                      mw::errorMsg(update_result.error()));
+    }
 }
 
 namespace
@@ -289,9 +345,12 @@ void WebMentionManager::sendWebMentionsSync(
         for(int hop = 0; hop <= MAX_REDIRECTS; ++hop)
         {
             session = session_factory_();
-            session->maxRedirections(0);
-            session->transferTimeout(TRANSFER_TIMEOUT);
-            session->maxSize(MAX_SIZE_BYTES);
+            session->followRedirects(false);
+            if(!configureSession(*session, 0, TRANSFER_TIMEOUT,
+                                 MAX_SIZE_BYTES))
+            {
+                break;
+            }
             mw::HTTPRequest req(current_url);
 
             auto res = session->get(req);
