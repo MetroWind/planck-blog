@@ -200,6 +200,7 @@ TEST_F(UserAppTest, CanHandleCreateDraft)
     app->start();
     {
         mw::HTTPSession client;
+        client.followRedirects(false);
         ASSIGN_OR_FAIL(
             const mw::HTTPResponse* res,
             client.post(
@@ -233,6 +234,7 @@ TEST_F(UserAppTest, CanHandlePublishFromNewDraft)
     app->start();
     {
         mw::HTTPSession client;
+        client.followRedirects(false);
         ASSIGN_OR_FAIL(
             const mw::HTTPResponse* res,
             client.post(
@@ -329,6 +331,7 @@ TEST_F(UserAppTest, CanHandleSavePost)
     app->start();
     {
         mw::HTTPSession client;
+        client.followRedirects(false);
         ASSIGN_OR_FAIL(
             const mw::HTTPResponse* res,
             client.post(
