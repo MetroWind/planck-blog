@@ -1,7 +1,5 @@
 #include <filesystem>
 #include <memory>
-#include <variant>
-
 #include <cxxopts.hpp>
 #include <mw/auth.hpp>
 #include <mw/http_client.hpp>
@@ -170,7 +168,7 @@ int main(int argc, char** argv)
     {
         spdlog::error(
             "Failed to create authentication module: {}",
-            std::visit([](const auto& e) { return e.msg; }, auth.error()));
+            mw::errorMsg(auth.error()));
         return 1;
     }
     auto data_source = DataSourceSqlite::fromFile(

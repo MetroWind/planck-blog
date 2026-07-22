@@ -13,7 +13,6 @@
 #include <sstream>
 #include <string>
 #include <thread>
-#include <variant>
 #include <vector>
 
 #include <httplib.h>
@@ -38,19 +37,16 @@
     auto tmp = val;                                                            \
     if(!tmp.has_value())                                                       \
     {                                                                          \
-        if(std::holds_alternative<mw::HTTPError>(tmp.error()))                 \
+        if(const mw::HTTPError* e = tmp.error().as<mw::HTTPError>())          \
         {                                                                      \
-            const mw::HTTPError& e = std::get<mw::HTTPError>(tmp.error());     \
-            res.status = e.code;                                               \
-            res.set_content(e.msg, "text/plain");                              \
+            res.status = e->code;                                             \
+            res.set_content(e->msg, "text/plain");                           \
             return;                                                            \
         }                                                                      \
         else                                                                   \
         {                                                                      \
             res.status = 500;                                                  \
-            res.set_content(                                                   \
-                std::visit([](const auto& e) { return e.msg; }, tmp.error()),  \
-                "text/plain");                                                 \
+            res.set_content(mw::errorMsg(tmp.error()), "text/plain");        \
             return;                                                            \
         }                                                                      \
     }                                                                          \

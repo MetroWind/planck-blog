@@ -32,11 +32,11 @@ mw::E<Theme> readThemeDir(const fs::path& dir)
     theme.dir = dir;
     if(tree["parent"].has_key())
     {
-        tree["parent"] >> theme.parent_name;
+        tree["parent"].load(&theme.parent_name);
     }
     if(tree["name"].has_key())
     {
-        tree["name"] >> theme.name;
+        tree["name"].load(&theme.name);
     }
     else
     {

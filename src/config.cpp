@@ -50,15 +50,15 @@ mw::E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     Configuration config;
     if(tree["data-dir"].readable())
     {
-        tree["data-dir"] >> config.data_dir;
+        tree["data-dir"].load(&config.data_dir);
     }
     if(tree["attachment-dir"].readable())
     {
-        tree["attachment-dir"] >> config.attachment_dir;
+        tree["attachment-dir"].load(&config.attachment_dir);
     }
     if(tree["listen-address"].readable())
     {
-        tree["listen-address"] >> config.listen_address;
+        tree["listen-address"].load(&config.listen_address);
     }
     if(tree["listen-port"].readable())
     {
@@ -69,46 +69,47 @@ mw::E<Configuration> Configuration::fromYaml(const std::filesystem::path& path)
     }
     if(tree["client-id"].readable())
     {
-        tree["client-id"] >> config.client_id;
+        tree["client-id"].load(&config.client_id);
     }
     if(tree["client-secret"].readable())
     {
-        tree["client-secret"] >> config.client_secret;
+        tree["client-secret"].load(&config.client_secret);
     }
     if(tree["openid-url-prefix"].readable())
     {
-        tree["openid-url-prefix"] >> config.openid_url_prefix;
+        tree["openid-url-prefix"].load(&config.openid_url_prefix);
     }
     if(tree["base-url"].readable())
     {
-        tree["base-url"] >> config.base_url;
+        tree["base-url"].load(&config.base_url);
     }
     if(tree["languages"].is_seq())
     {
         for(const auto& lang : tree["languages"])
         {
-            lang >> config.languages.emplace_back();
+            config.languages.emplace_back();
+            lang.load(&config.languages.back());
         }
     }
     if(tree["blog-title"].readable())
     {
-        tree["blog-title"] >> config.blog_title;
+        tree["blog-title"].load(&config.blog_title);
     }
     if(tree["default-theme"].readable())
     {
-        tree["default-theme"] >> config.default_theme;
+        tree["default-theme"].load(&config.default_theme);
     }
     if(tree["substitutions"].readable())
     {
         if(tree["substitutions"]["nav-center"].readable())
         {
-            tree["substitutions"]["nav-center"] >>
-                config.substitutions.nav_center;
+            tree["substitutions"]["nav-center"].load(
+                &config.substitutions.nav_center);
         }
         if(tree["substitutions"]["after-post"].readable())
         {
-            tree["substitutions"]["after-post"] >>
-                config.substitutions.after_post;
+            tree["substitutions"]["after-post"].load(
+                &config.substitutions.after_post);
         }
     }
 

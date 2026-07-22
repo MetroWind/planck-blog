@@ -12,6 +12,7 @@ include(FetchContent)
 FetchContent_Declare(
   libmw
   GIT_REPOSITORY https://github.com/MetroWind/libmw.git
+  GIT_TAG 29e8cc00deacfe8211248cfc85a7b44067612e60
 )
 
 FetchContent_Declare(

@@ -226,6 +226,8 @@ TEST(WebMention, SendWebMentionsDiscoverFromHeaderAndPost)
             class MockWrapper : public mw::HTTPSessionInterface
             {
                 std::shared_ptr<mw::HTTPSessionMock> mock_;
+                bool follow_redirects_ = true;
+                mw::AddressPredicate address_filter_;
 
             public:
                 MockWrapper(std::shared_ptr<mw::HTTPSessionMock> m) : mock_(m)
@@ -240,6 +242,18 @@ TEST(WebMention, SendWebMentionsDiscoverFromHeaderAndPost)
                 post(const mw::HTTPRequest& req) override
                 {
                     return mock_->post(req);
+                }
+                mw::E<mw::HTTPResponse>
+                getStream(const mw::HTTPRequest& req,
+                          mw::ChunkCallback on_chunk) override
+                {
+                    return mock_->getStream(req, std::move(on_chunk));
+                }
+                mw::E<mw::HTTPResponse>
+                postStream(const mw::HTTPRequest& req,
+                           mw::ChunkCallback on_chunk) override
+                {
+                    return mock_->postStream(req, std::move(on_chunk));
                 }
                 std::chrono::duration<long> transferTimeout() const override
                 {
@@ -275,6 +289,31 @@ TEST(WebMention, SendWebMentionsDiscoverFromHeaderAndPost)
                 {
                     return {};
                 }
+                bool followRedirects() const override
+                {
+                    return follow_redirects_;
+                }
+                void followRedirects(bool value) override
+                {
+                    follow_redirects_ = value;
+                }
+                const mw::AddressPredicate& addressFilter() const override
+                {
+                    return address_filter_;
+                }
+                void addressFilter(mw::AddressPredicate predicate) override
+                {
+                    address_filter_ = std::move(predicate);
+                }
+                mw::E<void> allowedProtocols(std::string_view) override
+                {
+                    return {};
+                }
+                mw::E<void>
+                allowedRedirectProtocols(std::string_view) override
+                {
+                    return {};
+                }
             };
             return std::make_unique<MockWrapper>(shared_mock);
         });
@@ -304,6 +343,16 @@ public:
     {
         return mock_->post(req);
     }
+    mw::E<mw::HTTPResponse>
+    getStream(const mw::HTTPRequest& req, mw::ChunkCallback on_chunk) override
+    {
+        return mock_->getStream(req, std::move(on_chunk));
+    }
+    mw::E<mw::HTTPResponse>
+    postStream(const mw::HTTPRequest& req, mw::ChunkCallback on_chunk) override
+    {
+        return mock_->postStream(req, std::move(on_chunk));
+    }
     std::chrono::duration<long> transferTimeout() const override
     {
         return std::chrono::duration<long>(0);
@@ -324,9 +373,26 @@ public:
     mw::E<void> maxSize(long) override { return {}; }
     long maxRedirections() const override { return 0; }
     mw::E<void> maxRedirections(long) override { return {}; }
+    bool followRedirects() const override { return follow_redirects_; }
+    void followRedirects(bool value) override { follow_redirects_ = value; }
+    const mw::AddressPredicate& addressFilter() const override
+    {
+        return address_filter_;
+    }
+    void addressFilter(mw::AddressPredicate predicate) override
+    {
+        address_filter_ = std::move(predicate);
+    }
+    mw::E<void> allowedProtocols(std::string_view) override { return {}; }
+    mw::E<void> allowedRedirectProtocols(std::string_view) override
+    {
+        return {};
+    }
 
 private:
     std::shared_ptr<mw::HTTPSessionMock> mock_;
+    bool follow_redirects_ = true;
+    mw::AddressPredicate address_filter_;
 };
 
 } // namespace
