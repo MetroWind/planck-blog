@@ -120,9 +120,10 @@ TEST(WebMention, VerifyWebMentionValidHtml)
                         static mw::HTTPResponse res;
                         res.status = 200;
                         res.header["Content-Type"] = "text/html";
-                        std::string body = "<html><body><p>Hello <a "
-                                           "href=\"http://target.com\">link</"
-                                           "a></p></body></html>";
+                        std::string body =
+                            "<html><body><p>Hello <strong>world</strong> "
+                            "&amp; <a href=\"http://target.com\">link</a>"
+                            "</p></body></html>";
                         res.payload = std::vector<std::byte>(
                             reinterpret_cast<const std::byte*>(body.data()),
                             reinterpret_cast<const std::byte*>(body.data() +
@@ -132,7 +133,9 @@ TEST(WebMention, VerifyWebMentionValidHtml)
         });
 
     EXPECT_CALL(data_mock,
-                updateWebMention(1, 1, _, _, testing::Ne(std::nullopt)))
+                updateWebMention(1, 1, _, _,
+                                 std::optional<std::string>(
+                                     "Hello world &amp; link")))
         .WillOnce(Return(mw::E<void>{}));
 
     wm.verifyWebMentionSync(1, "http://source.com/valid", "http://target.com");

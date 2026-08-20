@@ -584,11 +584,10 @@ mw::E<int64_t> DataSourceSqlite::upsertWebMention(const std::string& source,
         db->statementFromStr(
             "INSERT INTO WebMentions (source, target_id, status, created_at) "
             "VALUES (?, ?, 0, ?) ON CONFLICT(source, target_id) DO UPDATE SET "
-            "status = 0;"));
+            "status = 0 RETURNING id;"));
     DO_OR_RETURN(
         sql.bind(source, target_id, mw::timeToSeconds(mw::Clock::now())));
-    DO_OR_RETURN(db->execute(std::move(sql)));
-    return db->lastInsertRowID();
+    return db->evalToValue<int64_t>(std::move(sql));
 }
 
 mw::E<void>

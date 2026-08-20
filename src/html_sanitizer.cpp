@@ -183,85 +183,6 @@ TidyNode findTargetLink(TidyNode tnod, const std::string& target_url)
     return nullptr;
 }
 
-std::string serializeNode(TidyDoc tdoc, TidyNode tnod, size_t& current_length,
-                          size_t max_length)
-{
-    if(!tnod || current_length >= max_length)
-    {
-        return "";
-    }
-
-    TidyNodeType type = tidyNodeGetType(tnod);
-    if(type == TidyNode_Text)
-    {
-        TidyBuffer buf;
-        tidyBufInit(&buf);
-        tidyNodeGetValue(tdoc, tnod, &buf);
-        std::string res;
-        if(buf.bp)
-        {
-            res = htmlEscape((char*)buf.bp);
-        }
-        tidyBufFree(&buf);
-
-        if(current_length + res.length() > max_length)
-        {
-            res = res.substr(0, max_length - current_length) + "...";
-            current_length = max_length;
-        }
-        else
-        {
-            current_length += res.length();
-        }
-        return res;
-    }
-    else if(type == TidyNode_Start || type == TidyNode_End ||
-            type == TidyNode_StartEnd)
-    {
-        std::string res;
-        ctmbstr name = tidyNodeGetName(tnod);
-        if(name)
-        {
-            res += "<" + std::string(name);
-            for(TidyAttr attr = tidyAttrFirst(tnod); attr;
-                attr = tidyAttrNext(attr))
-            {
-                ctmbstr attrName = tidyAttrName(attr);
-                ctmbstr attrVal = tidyAttrValue(attr);
-                if(attrName)
-                {
-                    res += " " + std::string(attrName);
-                    if(attrVal)
-                    {
-                        res += "=\"" + htmlEscape(std::string(attrVal)) + "\"";
-                    }
-                }
-            }
-            if(type == TidyNode_StartEnd)
-            {
-                res += "/>";
-            }
-            else
-            {
-                res += ">";
-            }
-        }
-
-        for(TidyNode child = tidyGetChild(tnod); child;
-            child = tidyGetNext(child))
-        {
-            res += serializeNode(tdoc, child, current_length, max_length);
-        }
-
-        if(name && type != TidyNode_StartEnd)
-        {
-            res += "</" + std::string(name) + ">";
-        }
-        return res;
-    }
-    return "";
-}
-
 bool isBlockLevel(const std::string& name)
 {
     static const std::set<std::string> blocks = {
@@ -352,7 +273,14 @@ void collectInnerText(TidyDoc tdoc, TidyNode node, std::string& out,
         tidyNodeGetValue(tdoc, node, &buf);
         if(buf.bp)
         {
-            out += reinterpret_cast<const char*>(buf.bp);
+            size_t size = buf.size;
+            if(size > 0 && buf.bp[size - 1] == '\0')
+            {
+                --size;
+            }
+            size_t remaining = max_len - out.size();
+            out.append(reinterpret_cast<const char*>(buf.bp),
+                       std::min(size, remaining));
         }
         tidyBufFree(&buf);
         return;
@@ -457,11 +385,14 @@ HtmlSanitizer::extractAndSanitizeSnippet(const std::string& raw_html,
         parent = tidyGetParent(blockNode);
     }
 
-    size_t current_len = 0;
-    std::string snippet =
-        serializeNode(tdoc, blockNode, current_len, max_length);
-
-    return snippet;
+    std::string snippet;
+    collectInnerText(tdoc, blockNode, snippet, max_length);
+    std::string_view stripped = mw::strip(snippet);
+    if(stripped.empty())
+    {
+        return std::nullopt;
+    }
+    return htmlEscape(std::string(stripped));
 }
 
 std::optional<std::string>

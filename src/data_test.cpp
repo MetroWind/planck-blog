@@ -176,9 +176,14 @@ TEST(DataSource, WebMentionsUpsertAndFetch)
     EXPECT_EQ(verified[0].author_name.value_or(""), "Alice");
     EXPECT_EQ(verified[0].content.value_or(""), "Hello!");
 
-    // Upsert again (should update status to 0)
-    EXPECT_TRUE(
-        isExpected(data->upsertWebMention("http://source.com", post_id)));
+    // A different insert changes SQLite's last inserted ID. A duplicate
+    // upsert must nevertheless return the original mention's ID.
+    ASSIGN_OR_FAIL(int64_t m2_id,
+                   data->upsertWebMention("http://other-source.com", post_id));
+    EXPECT_NE(m1_id, m2_id);
+    ASSIGN_OR_FAIL(int64_t updated_m1_id,
+                   data->upsertWebMention("http://source.com", post_id));
+    EXPECT_EQ(updated_m1_id, m1_id);
 
     ASSIGN_OR_FAIL(verified, data->getVerifiedWebMentionsForPost(post_id));
     EXPECT_TRUE(verified.empty()); // Status is 0 now
