@@ -65,6 +65,45 @@ code, pre
     word-break: break-all;
 }
 
+[hidden]
+{
+    display: none;
+}
+
+#WebmentionInfo
+{
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    overflow: hidden;
+    transition: grid-template-rows 500ms ease, opacity 500ms ease;
+}
+
+#WebmentionInfo[hidden]
+{
+    display: none;
+}
+
+#WebmentionInfo.is-expanded
+{
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+
+#WebmentionInfo > *
+{
+    min-height: 0;
+    overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce)
+{
+    #WebmentionInfo
+    {
+        transition: none;
+    }
+}
+
 #NavLeft svg
 {
     display: inline-block;

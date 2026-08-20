@@ -8,5 +8,6 @@
 <script>const SELECT_THEME_ENDPOINT = "{{ url_for("select-theme") }}";</script>
 <script defer src="{{ url_for("statics", "theme-selector.js") }}"></script>
 <script defer src="{{ url_for("statics", "menu.js") }}"></script>
+<script defer src="{{ url_for("statics", "webmention-info.js") }}"></script>
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <link rel="webmention" href="{{ url_for("webmention") }}" />

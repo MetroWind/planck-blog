@@ -41,29 +41,56 @@
             <div id="PostBody" class="e-content">{{ post.content }}</div>
           </article>
 
-          {% if length(webmentions) > 0 %}
-          <section class="webmentions">
-              <h3>WebMentions</h3>
-              <ul class="mention-list">
-                  {% for mention in webmentions %}
-                  <li class="mention-item">
-                      <div class="mention-meta">
-                          {% if existsIn(mention, "author_photo") %}
-                          <img src="{{ mention.author_photo }}" class="mention-avatar" alt="Author photo">
-                          {% endif %}
-                          <span class="mention-author">{{ default(mention.author_name, "Someone") }}</span>
-                          <span class="mention-source">mentioned this on <a href="{{ mention.source }}">{{ mention.source }}</a></span>
-                      </div>
-                      {% if existsIn(mention, "content") %}
-                      <blockquote class="mention-snippet">
-                          {{ mention.content }}
-                      </blockquote>
-                      {% endif %}
-                  </li>
-                  {% endfor %}
-              </ul>
+          <hr/>
+          <section id="Webmentions">
+            <h3>Comments
+              <a href="#WebmentionInfo" id="WebmentionInfoToggle"
+                 aria-controls="WebmentionInfo"
+                 aria-expanded="false">[How?]</a>
+            </h3>
+            <section id="WebmentionInfo" hidden>
+              <p>
+                To help keeping the internet open and independent,
+                this blog uses
+                <a href="https://indieweb.org/Webmention">Webmention</a>
+                for comments. To comment, publish a page that links to
+                this post, then send a Webmention with your page as
+                the <code>source</code> and this post as
+                the <code>target</code>. Your response will appear
+                here.
+              </p>
+              <p>Webmention is supported by a number of popular
+                blogging platforms such as micro.blog, Wordpress,
+                Known, and Kirby. If your platform does not support
+                it, you can still write the comment on your blog
+                (remember to actually mention this post by URL), and
+                send it via
+                Webmention <a href="https://webmention.app/">webmention.app</a>.
+                Yeah, it’s magic.
+              </p>
+            </section>
+
+            {% if length(webmentions) > 0 %}
+            <ul class="mention-list">
+              {% for mention in webmentions %}
+              <li class="mention-item">
+                <div class="mention-meta">
+                  {% if existsIn(mention, "author_photo") %}
+                  <img src="{{ mention.author_photo }}" class="mention-avatar" alt="Author photo">
+                  {% endif %}
+                  <span class="mention-author">{{ default(mention.author_name, "Someone") }}</span>
+                  <span class="mention-source">mentioned this on <a href="{{ mention.source }}">{{ mention.source }}</a></span>
+                </div>
+                {% if existsIn(mention, "content") %}
+                <blockquote class="mention-snippet">
+                  {{ mention.content }}
+                </blockquote>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
           </section>
-          {% endif %}
 
           <hr/>
           <div id="AfterPost">

@@ -209,6 +209,23 @@ h1.PostTitle > a
     }
 }
 
+#Webmentions
+{
+    font-size: 0.9rem;
+    margin: 3em 0;
+    h3 > a
+    {
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+}
+
+#WebmentionInfo
+{
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
 #AfterPost
 {
     margin: 3em 0;

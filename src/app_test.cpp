@@ -299,6 +299,12 @@ TEST_F(UserAppTest, CanHandlePost)
         EXPECT_THAT(res->payloadAsStr(),
                     HasSubstr("<div id=\"PostBody\" class=\"e-content\">"));
         EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("https://indieweb.org/Webmention"));
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("id=\"WebmentionInfoToggle\""));
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("<section id=\"WebmentionInfo\" hidden>"));
+        EXPECT_THAT(res->payloadAsStr(),
                     HasSubstr("ddd http://localhost:8080/blog eee"));
     }
     app->stop();
