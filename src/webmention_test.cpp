@@ -119,7 +119,7 @@ TEST(WebMention, VerifyWebMentionValidHtml)
                     {
                         static mw::HTTPResponse res;
                         res.status = 200;
-                        res.header["Content-Type"] = "text/html";
+                        res.header["content-type"] = "text/html";
                         std::string body =
                             "<html><body><p>Hello <strong>world</strong> "
                             "&amp; <a href=\"http://target.com\">link</a>"
@@ -159,7 +159,7 @@ TEST(WebMention, VerifyWebMentionExtractsMicroformatsAuthor)
                     {
                         static mw::HTTPResponse res;
                         res.status = 200;
-                        res.header["Content-Type"] = "text/html";
+                        res.header["content-type"] = "text/html";
                         // h-card with a relative photo URL — should be
                         // resolved against the source page URL.
                         std::string body =

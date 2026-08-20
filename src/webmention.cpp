@@ -66,6 +66,25 @@ bool configureSession(mw::HTTPSessionInterface& session,
     return true;
 }
 
+std::optional<std::string> findHeader(const mw::HTTPResponse& response,
+                                      std::string_view name)
+{
+    std::string lower_name(name);
+    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
+                   ::tolower);
+    for(const auto& [key, value] : response.header)
+    {
+        std::string lower_key = key;
+        std::transform(lower_key.begin(), lower_key.end(), lower_key.begin(),
+                       ::tolower);
+        if(lower_key == lower_name)
+        {
+            return value;
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 void WebMentionManager::verifyWebMention(int64_t mention_id,
@@ -129,12 +148,10 @@ void WebMentionManager::verifyWebMentionSync(int64_t mention_id,
         return;
     }
 
-    std::string content_type;
-    auto it = response->header.find("Content-Type");
-    if(it != response->header.end())
-    {
-        content_type = it->second;
-    }
+    std::string content_type =
+        findHeader(*response, "content-type").value_or("");
+    std::transform(content_type.begin(), content_type.end(),
+                   content_type.begin(), ::tolower);
 
     std::optional<std::string> snippet;
     std::optional<std::string> author_name;
@@ -318,28 +335,6 @@ void WebMentionManager::sendWebMentions(
                 { this->sendWebMentionsSync(source_url, target_urls); })
         .detach();
 }
-
-namespace
-{
-
-std::optional<std::string> findHeader(const mw::HTTPResponse& res,
-                                      std::string_view name)
-{
-    std::string lname(name);
-    std::transform(lname.begin(), lname.end(), lname.begin(), ::tolower);
-    for(const auto& [k, v] : res.header)
-    {
-        std::string lk = k;
-        std::transform(lk.begin(), lk.end(), lk.begin(), ::tolower);
-        if(lk == lname)
-        {
-            return v;
-        }
-    }
-    return std::nullopt;
-}
-
-} // namespace
 
 void WebMentionManager::sendWebMentionsSync(
     const std::string& source_url,
