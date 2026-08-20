@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <regex>
 #include <sstream>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -14,6 +15,14 @@
 
 namespace
 {
+
+constexpr size_t MAX_ERROR_PAYLOAD_LOG_BYTES = 4096;
+
+std::string_view errorPayloadForLog(const mw::HTTPResponse& response)
+{
+    std::string_view payload = response.payloadAsStr();
+    return payload.substr(0, MAX_ERROR_PAYLOAD_LOG_BYTES);
+}
 
 void deleteWebMention(DataSourceInterface& data, int64_t mention_id)
 {
@@ -287,8 +296,15 @@ void notifyEndpoint(
     }
     else if((*res)->status >= 400)
     {
-        spdlog::error("Webmention notification to {} returned status {}",
-                      endpoint, (*res)->status);
+        std::string_view response_payload = errorPayloadForLog(**res);
+        bool was_truncated =
+            response_payload.size() < (*res)->payloadAsStr().size();
+        spdlog::error(
+            "Webmention notification to {} returned status {}. "
+            "Response payload{}: {}",
+            endpoint, (*res)->status,
+            was_truncated ? " (truncated to 4096 bytes)" : "",
+            response_payload);
     }
 }
 
