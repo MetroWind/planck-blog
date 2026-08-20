@@ -7,12 +7,52 @@
 #include <vector>
 
 #include <mw/utils.hpp>
+#include <spdlog/spdlog.h>
 #include <string.h>
 #include <tidy.h>
 #include <tidybuffio.h>
 
 namespace
 {
+
+constexpr size_t MAX_TIDY_DIAGNOSTIC_LOG_BYTES = 4096;
+
+class TidyDocument
+{
+public:
+    TidyDocument() : doc_(tidyCreate())
+    {
+        tidyBufInit(&diagnostics_);
+        tidySetErrorBuffer(doc_, &diagnostics_);
+    }
+
+    ~TidyDocument()
+    {
+        size_t size = diagnostics_.size;
+        if(size > 0 && diagnostics_.bp[size - 1] == '\0')
+        {
+            --size;
+        }
+        if(size > 0)
+        {
+            size_t logged_size =
+                std::min(size, MAX_TIDY_DIAGNOSTIC_LOG_BYTES);
+            spdlog::debug(
+                "Tidy diagnostics{}: {}",
+                logged_size < size ? " (truncated to 4096 bytes)" : "",
+                std::string_view(reinterpret_cast<const char*>(diagnostics_.bp),
+                                 logged_size));
+        }
+        tidyRelease(doc_);
+        tidyBufFree(&diagnostics_);
+    }
+
+    TidyDoc get() const { return doc_; }
+
+private:
+    TidyDoc doc_;
+    TidyBuffer diagnostics_;
+};
 
 std::string htmlEscape(const std::string& str)
 {
@@ -370,7 +410,8 @@ HtmlSanitizer::extractAndSanitizeSnippet(const std::string& raw_html,
                                          const std::string& target_url,
                                          size_t max_length)
 {
-    TidyDoc tdoc = tidyCreate();
+    TidyDocument document;
+    TidyDoc tdoc = document.get();
     tidyOptSetBool(tdoc, TidyForceOutput, yes);
     tidyOptSetBool(tdoc, TidyBodyOnly, yes);
     tidyOptSetBool(tdoc, TidyMark, no);
@@ -381,7 +422,6 @@ HtmlSanitizer::extractAndSanitizeSnippet(const std::string& raw_html,
     TidyNode body = tidyGetBody(tdoc);
     if(!body)
     {
-        tidyRelease(tdoc);
         return std::nullopt;
     }
 
@@ -390,7 +430,6 @@ HtmlSanitizer::extractAndSanitizeSnippet(const std::string& raw_html,
     TidyNode linkNode = findTargetLink(body, target_url);
     if(!linkNode)
     {
-        tidyRelease(tdoc);
         return std::nullopt;
     }
 
@@ -422,14 +461,14 @@ HtmlSanitizer::extractAndSanitizeSnippet(const std::string& raw_html,
     std::string snippet =
         serializeNode(tdoc, blockNode, current_len, max_length);
 
-    tidyRelease(tdoc);
     return snippet;
 }
 
 std::optional<std::string>
 HtmlSanitizer::discoverWebmentionEndpoint(const std::string& raw_html)
 {
-    TidyDoc tdoc = tidyCreate();
+    TidyDocument document;
+    TidyDoc tdoc = document.get();
     tidyOptSetBool(tdoc, TidyForceOutput, yes);
     tidyOptSetBool(tdoc, TidyMark, no);
 
@@ -518,7 +557,6 @@ HtmlSanitizer::discoverWebmentionEndpoint(const std::string& raw_html)
 
     find_endpoint(find_endpoint, tidyGetRoot(tdoc));
 
-    tidyRelease(tdoc);
     return endpoint;
 }
 
@@ -527,7 +565,8 @@ HtmlSanitizer::extractAuthor(const std::string& raw_html)
 {
     AuthorInfo info;
 
-    TidyDoc tdoc = tidyCreate();
+    TidyDocument document;
+    TidyDoc tdoc = document.get();
     tidyOptSetBool(tdoc, TidyForceOutput, yes);
     tidyOptSetBool(tdoc, TidyMark, no);
     tidyParseString(tdoc, raw_html.c_str());
@@ -621,6 +660,5 @@ HtmlSanitizer::extractAuthor(const std::string& raw_html)
         }
     }
 
-    tidyRelease(tdoc);
     return info;
 }

@@ -280,7 +280,24 @@ TEST_F(UserAppTest, CanHandlePost)
                 mw::HTTPRequest("http://localhost:8080/blog/p/1")
                     .addHeader("Cookie", "planck-blog-access-token=aaa")));
         EXPECT_EQ(res->status, 200) << "Response body: " << res->payloadAsStr();
-        EXPECT_THAT(res->payloadAsStr(), HasSubstr("<h1>aaa</h1>"));
+        EXPECT_THAT(
+            res->payloadAsStr(),
+            HasSubstr("<article id=\"Post\" class=\"h-entry\""));
+        EXPECT_THAT(
+            res->payloadAsStr(),
+            HasSubstr("<a class=\"p-name u-url\""));
+        EXPECT_THAT(
+            res->payloadAsStr(),
+            HasSubstr("href=\"http://localhost:8080/blog/p/1\">aaa</a>"));
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("<span id=\"Author\" "
+                              "class=\"p-author h-card\">"));
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("<span class=\"p-name\">mw</span>"));
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("<time class=\"dt-published\""));
+        EXPECT_THAT(res->payloadAsStr(),
+                    HasSubstr("<div id=\"PostBody\" class=\"e-content\">"));
         EXPECT_THAT(res->payloadAsStr(),
                     HasSubstr("ddd http://localhost:8080/blog eee"));
     }

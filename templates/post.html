@@ -17,15 +17,20 @@
           <h1><a href="{{ url_for("index") }}">{{ blog_title }}</a></h1>
         </header>
         <main id="PostMain">
-          <article id="Post" lang="{{ post.language }}">
-            <h1>{{ post.title }}</h1>
+          <article id="Post" class="h-entry" lang="{{ post.language }}">
+            <h1><a class="p-name u-url"
+                   href="{{ url_for("post", post.id) }}">{{ post.title }}</a></h1>
             <div id="Metadata">
-              By <span id="Author">{{ post.author }}</span>
-              @<time datetime="{{ post.publish_time_iso8601 }}">
+              By <span id="Author" class="p-author h-card">
+                <span class="p-name">{{ post.author }}</span>
+              </span>
+              @<time class="dt-published"
+                     datetime="{{ post.publish_time_iso8601 }}">
                 {{ post.publish_time_str }}
               </time>
               {% if length(post.update_time_str) > 0 %}
-              Updated @<time datetime="{{ post.update_time_iso8601 }}">
+              Updated @<time class="dt-updated"
+                             datetime="{{ post.update_time_iso8601 }}">
                 {{ post.update_time_str }}
               </time>
               {% endif %}
@@ -33,7 +38,7 @@
               <a href="{{ url_for("edit-post", post.id) }}">[EDIT]</a>
               {% endif %}
             </div>
-            <div id="PostBody">{{ post.content }}</div>
+            <div id="PostBody" class="e-content">{{ post.content }}</div>
           </article>
 
           {% if length(webmentions) > 0 %}
